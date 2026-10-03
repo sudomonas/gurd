@@ -48,6 +48,7 @@ pub fn fixture_db(dir: &Path) -> PathBuf {
             source: &gurd::sources::rxnorm::RxNorm,
             input: &input,
             upstream_checksum: None,
+            retrieved_at: None,
         }],
     )
     .unwrap();

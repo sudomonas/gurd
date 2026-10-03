@@ -53,6 +53,7 @@ impl Source for RxNorm {
             stale_after_days: Some(45),
             download_url: Some(CURRENT_URL.into()),
             checksums_url: Some(FILES_PAGE.into()),
+            notice: None,
         }
     }
 
@@ -82,6 +83,9 @@ impl Source for RxNorm {
         import_attributes(input, sink, &concepts)?;
         for &(from, section, path, to) in NAVIGATION {
             sink.navigation(from, section, path, to)?;
+        }
+        for (rank, &(key, label, summary)) in ATTRIBUTE_KEYS.iter().enumerate() {
+            sink.attribute_key(key, label, rank as i64, summary)?;
         }
         Ok(())
     }
@@ -180,6 +184,30 @@ const NAVIGATION: &[(Kind, Section, &[&str], Kind)] = {
         (BrandedComponent, BrandedDrugs, &["constitutes"], BrandedDrug),
     ]
 };
+
+/// Display labels for RxNorm attribute names (ATN), in display order. Unlisted
+/// attributes are shown in the detailed view under their own names.
+#[rustfmt::skip]
+const ATTRIBUTE_KEYS: &[(&str, &str, bool)] = &[
+    ("RXN_STRENGTH", "Strength", true),
+    ("RXN_AVAILABLE_STRENGTH", "Available strength", true),
+    ("RXN_QUANTITY", "Quantity", true),
+    ("RXN_QUALITATIVE_DISTINCTION", "Distinction", true),
+    ("RXTERM_FORM", "RxTerms form", false),
+    ("RXN_HUMAN_DRUG", "Human drug", false),
+    ("RXN_VET_DRUG", "Veterinary drug", false),
+    ("RXN_BN_CARDINALITY", "Brand cardinality", false),
+    ("RXN_IN_EXPRESSED_FLAG", "Ingredient expressed", false),
+    ("RXN_BOSS_FROM", "Strength basis", false),
+    ("RXN_AI", "Active ingredient", false),
+    ("RXN_AM", "Active moiety", false),
+    ("RXN_BOSS_STRENGTH_NUM_VALUE", "Strength numerator", false),
+    ("RXN_BOSS_STRENGTH_NUM_UNIT", "Strength numerator unit", false),
+    ("RXN_BOSS_STRENGTH_DENOM_VALUE", "Strength denominator", false),
+    ("RXN_BOSS_STRENGTH_DENOM_UNIT", "Strength denominator unit", false),
+    ("RXN_ACTIVATED", "Activated", false),
+    ("RXN_OBSOLETED", "Obsoleted", false),
+];
 
 /// RxNorm term type → application kind, for the term types that define a concept.
 fn kind_for(tty: &str) -> Option<Kind> {

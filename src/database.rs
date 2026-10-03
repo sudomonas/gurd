@@ -7,9 +7,12 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use crate::models::SourceRecord;
 
 /// Schema version stored in `PRAGMA user_version`.
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 
-const MIGRATIONS: &[&str] = &[include_str!("../migrations/0001_init.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("../migrations/0001_init.sql"),
+    include_str!("../migrations/0002_multi_source.sql"),
+];
 
 /// Returned when no database file exists at the expected path.
 #[derive(Debug)]
@@ -83,7 +86,7 @@ impl Database {
             "SELECT slug, title, code_system, provider, version, release_date, license, attribution, url,
                     file_name, upstream_checksum, sha256, retrieved_at, imported_at,
                     importer_version, origin, redistributable, stale_after_days,
-                    CAST(julianday('now') - julianday(release_date) AS INTEGER)
+                    CAST(julianday('now') - julianday(release_date) AS INTEGER), notice
              FROM sources ORDER BY slug",
         )?;
         let rows = stmt.query_map([], |row| {
@@ -110,6 +113,7 @@ impl Database {
                 stale_after_days,
                 age_days,
                 stale: matches!((age_days, stale_after_days), (Some(age), Some(max)) if age > max),
+                notice: row.get(19)?,
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)

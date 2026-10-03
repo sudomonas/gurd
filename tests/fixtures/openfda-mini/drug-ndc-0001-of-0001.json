@@ -1,0 +1,242 @@
+{
+ "meta": {
+  "disclaimer": "Do not rely on openFDA to make decisions regarding medical care. While we make every effort to ensure that data is accurate, you should assume all results are unvalidated. We may limit or otherwise restrict your access to the API in line with our Terms of Service.",
+  "terms": "https://open.fda.gov/terms/",
+  "license": "https://open.fda.gov/license/",
+  "last_updated": "2026-10-02",
+  "results": {
+   "skip": 0,
+   "limit": 4,
+   "total": 4
+  }
+ },
+ "results": [
+  {
+   "product_ndc": "71335-3138",
+   "generic_name": "Amoxicillin and Clavulanate Potassium",
+   "labeler_name": "Bryant Ranch Prepack",
+   "brand_name": "Amoxicillin and Clavulanate Potassium",
+   "active_ingredients": [
+    {
+     "name": "AMOXICILLIN",
+     "strength": "875 mg/1"
+    },
+    {
+     "name": "CLAVULANATE POTASSIUM",
+     "strength": "125 mg/1"
+    }
+   ],
+   "finished": true,
+   "packaging": [
+    {
+     "package_ndc": "71335-3138-1",
+     "description": "20 TABLET, FILM COATED in 1 BOTTLE (71335-3138-1)",
+     "marketing_start_date": "20260527",
+     "sample": false
+    }
+   ],
+   "listing_expiration_date": "20271231",
+   "openfda": {
+    "manufacturer_name": [
+     "Bryant Ranch Prepack"
+    ],
+    "rxcui": [
+     "562508"
+    ],
+    "spl_set_id": [
+     "263a2902-f85c-46b6-8d5b-8c99f5c4b706"
+    ],
+    "unii": [
+     "804826J2HU",
+     "Q42OMW3AT8"
+    ]
+   },
+   "marketing_category": "ANDA",
+   "dosage_form": "TABLET, FILM COATED",
+   "spl_id": "d24abaf3-6181-4adb-865b-041742fc6356",
+   "product_type": "HUMAN PRESCRIPTION DRUG",
+   "route": [
+    "ORAL"
+   ],
+   "marketing_start_date": "20120120",
+   "product_id": "71335-3138_d24abaf3-6181-4adb-865b-041742fc6356",
+   "application_number": "ANDA091568",
+   "brand_name_base": "Amoxicillin and Clavulanate Potassium",
+   "pharm_class": [
+    "Penicillin-class Antibacterial [EPC]",
+    "Penicillins [CS]",
+    "beta Lactamase Inhibitor [EPC]",
+    "beta Lactamase Inhibitors [MoA]"
+   ]
+  },
+  {
+   "product_ndc": "72162-2211",
+   "generic_name": "Amoxicillin and Clavulanate Potassium",
+   "labeler_name": "Bryant Ranch Prepack",
+   "brand_name": "Amoxicillin and Clavulanate Potassium",
+   "active_ingredients": [
+    {
+     "name": "AMOXICILLIN",
+     "strength": "875 mg/1"
+    },
+    {
+     "name": "CLAVULANATE POTASSIUM",
+     "strength": "125 mg/1"
+    }
+   ],
+   "finished": true,
+   "packaging": [
+    {
+     "package_ndc": "72162-2211-2",
+     "description": "20 TABLET, FILM COATED in 1 BOTTLE (72162-2211-2)",
+     "marketing_start_date": "20020314",
+     "sample": false
+    }
+   ],
+   "listing_expiration_date": "20261231",
+   "openfda": {
+    "manufacturer_name": [
+     "Bryant Ranch Prepack"
+    ],
+    "rxcui": [
+     "562508"
+    ],
+    "spl_set_id": [
+     "917a76e9-eb2b-4d49-9418-ff919a73cfad"
+    ],
+    "unii": [
+     "804826J2HU",
+     "Q42OMW3AT8"
+    ]
+   },
+   "marketing_category": "ANDA",
+   "dosage_form": "TABLET, FILM COATED",
+   "spl_id": "11986a98-d463-4906-a6f0-21b8f001cc4e",
+   "product_type": "HUMAN PRESCRIPTION DRUG",
+   "route": [
+    "ORAL"
+   ],
+   "marketing_start_date": "20020314",
+   "product_id": "72162-2211_11986a98-d463-4906-a6f0-21b8f001cc4e",
+   "application_number": "ANDA065063",
+   "brand_name_base": "Amoxicillin and Clavulanate Potassium",
+   "pharm_class": [
+    "Penicillin-class Antibacterial [EPC]",
+    "Penicillins [CS]",
+    "beta Lactamase Inhibitor [EPC]",
+    "beta Lactamase Inhibitors [MoA]"
+   ]
+  },
+  {
+   "product_ndc": "72789-456",
+   "generic_name": "Amoxicillin and Clavulanate Potassium",
+   "labeler_name": "PD-Rx Pharmaceuticals, Inc.",
+   "brand_name": "Amoxicillin and Clavulanate Potassium",
+   "active_ingredients": [
+    {
+     "name": "AMOXICILLIN",
+     "strength": "875 mg/1"
+    },
+    {
+     "name": "CLAVULANATE POTASSIUM",
+     "strength": "125 mg/1"
+    }
+   ],
+   "finished": true,
+   "packaging": [
+    {
+     "package_ndc": "72789-456-14",
+     "description": "14 TABLET, FILM COATED in 1 BOTTLE, PLASTIC (72789-456-14)",
+     "marketing_start_date": "20241211",
+     "sample": false
+    }
+   ],
+   "listing_expiration_date": "20271231",
+   "openfda": {
+    "manufacturer_name": [
+     "PD-Rx Pharmaceuticals, Inc."
+    ],
+    "rxcui": [
+     "562508"
+    ],
+    "spl_set_id": [
+     "7ef8592d-c7d0-49a4-a559-3190e559fa2f"
+    ],
+    "unii": [
+     "804826J2HU",
+     "Q42OMW3AT8"
+    ]
+   },
+   "marketing_category": "ANDA",
+   "dosage_form": "TABLET, FILM COATED",
+   "spl_id": "4d7ba437-b03d-da23-e063-6394a90ac533",
+   "product_type": "HUMAN PRESCRIPTION DRUG",
+   "route": [
+    "ORAL"
+   ],
+   "marketing_start_date": "20120120",
+   "product_id": "72789-456_4d7ba437-b03d-da23-e063-6394a90ac533",
+   "application_number": "ANDA091568",
+   "brand_name_base": "Amoxicillin and Clavulanate Potassium",
+   "pharm_class": [
+    "Penicillin-class Antibacterial [EPC]",
+    "Penicillins [CS]",
+    "beta Lactamase Inhibitor [EPC]",
+    "beta Lactamase Inhibitors [MoA]"
+   ]
+  },
+  {
+   "product_ndc": "0615-8577",
+   "generic_name": "Metformin Hydrochloride",
+   "labeler_name": "NCS HealthCare of KY, LLC dba Vangard Labs",
+   "brand_name": "Metformin Hydrochloride",
+   "active_ingredients": [
+    {
+     "name": "METFORMIN HYDROCHLORIDE",
+     "strength": "850 mg/1"
+    }
+   ],
+   "finished": true,
+   "packaging": [
+    {
+     "package_ndc": "0615-8577-39",
+     "description": "30 TABLET, FILM COATED in 1 BLISTER PACK (0615-8577-39)",
+     "marketing_start_date": "20250418",
+     "sample": false
+    }
+   ],
+   "listing_expiration_date": "20271231",
+   "openfda": {
+    "manufacturer_name": [
+     "NCS HealthCare of KY, LLC dba Vangard Labs"
+    ],
+    "rxcui": [
+     "861004",
+     "861007",
+     "861010"
+    ],
+    "spl_set_id": [
+     "0448c618-2f0d-4ed3-866f-74b413cf902d"
+    ],
+    "unii": [
+     "786Z46389E"
+    ]
+   },
+   "marketing_category": "ANDA",
+   "dosage_form": "TABLET, FILM COATED",
+   "spl_id": "eda81df8-05d9-4eac-b058-7eb51d7aa6e4",
+   "product_type": "HUMAN PRESCRIPTION DRUG",
+   "route": [
+    "ORAL"
+   ],
+   "marketing_start_date": "20240329",
+   "product_id": "0615-8577_eda81df8-05d9-4eac-b058-7eb51d7aa6e4",
+   "application_number": "ANDA077095",
+   "brand_name_base": "Metformin Hydrochloride",
+   "pharm_class": [
+    "Biguanide [EPC]",
+    "Biguanides [CS]"
+   ]
+  }
+ ]
+}

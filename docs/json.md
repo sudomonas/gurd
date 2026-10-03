@@ -89,7 +89,7 @@ Each result is a concept plus:
 
 | Key | Description |
 |---|---|
-| `match` | How it matched: `exact`, `prefix`, `token`, `substring` or `fuzzy`, strongest first |
+| `match` | How it matched: `exact`, `prefix`, `token`, `substring` or `fuzzy`, strongest first. Substring matching is skipped when there is an exact match |
 | `matched_name` | The name that matched. This may be a synonym, e.g. `metFORMIN HCl 500 MG Oral Tablet` |
 
 Results are ordered by match strength, then kind, then name length. `--limit N` (default
@@ -115,7 +115,7 @@ Results are ordered by match strength, then kind, then name length. `--limit N` 
         { "name": "metFORMIN HCl 500 MG Oral Tablet", "name_type": "prescribable", "source_type": "PSN" }
       ],
       "identifiers": [ { "system": "ndc", "value": "00093104801" } ],
-      "attributes": [ { "key": "RXN_HUMAN_DRUG", "value": "US" } ],
+      "attributes": [ { "key": "RXN_HUMAN_DRUG", "label": "Human drug", "value": "US" } ],
       "relationships": [
         { "predicate": "has_dose_form", "concept": { "...concept...": "" } }
       ]
@@ -124,16 +124,19 @@ Results are ordered by match strength, then kind, then name length. `--limit N` 
 }
 ```
 
-`show` returns the best match for the query, or every concept with the identifier if the
+`show` returns the best match for the query and every other concept, from any source,
+with exactly the same (normalized) name; or every concept with the identifier if the
 query looks like `system:value`. `rxcui` and `id` return every concept carrying the
-identifier, which can come from more than one source.
+identifier, which can come from more than one source. In each case the concepts of other
+sources that share an `rxcui` or `unii` identifier with them follow, at most 20 per source
+and identifier. Concepts are never linked by name.
 
 | Key | Description |
 |---|---|
-| `sections` | Related concepts grouped for reading: `ingredients`, `precise_ingredients`, `brands`, `clinical_drugs`, `branded_drugs`, `combinations`, `dose_forms`, `packs`, `contents`. Empty sections are omitted. Sections are gathered from the source's own relationships; nothing is inferred |
+| `sections` | Related concepts grouped for reading: `ingredients`, `precise_ingredients`, `brands`, `products`, `clinical_drugs`, `branded_drugs`, `combinations`, `dose_forms`, `packs`, `contents`. Empty sections are omitted. Sections are gathered from the source's own relationships; nothing is inferred |
 | `names` | Every name of the concept. `name_type` is `preferred`, `synonym`, `prescribable` or `tall_man`; `source_type` is the source's own term type |
 | `identifiers` | Identifiers the source assigns: `rxcui`, `ndc`, `unii`, ... |
-| `attributes` | Source attributes, keys verbatim (RxNorm `ATN`, e.g. `RXN_STRENGTH`) |
+| `attributes` | Source attributes in display order. `key` is the source's own name (RxNorm `ATN`, e.g. `RXN_STRENGTH`; for other sources the adapter's name for a column, e.g. `composition`); `label` is a readable name declared by the source's adapter, or the key itself. A key with several values (e.g. `side_effect`) appears once per value, in the source's order |
 | `relationships` | Direct relationships as the source records them: "*this concept* `predicate` *concept*". Predicates are verbatim (RxNorm `RELA`) |
 
 ## `gurd class <query>`
@@ -150,8 +153,15 @@ identifier, which can come from more than one source.
 }
 ```
 
-`concept` is the best match, or `null` if nothing matched. `classes` is empty unless an
-installed source provides drug classes. RxNorm Current Prescribable Content does not.
+The classes come from every concept that matches the query exactly (or the best match if
+none does), across sources. For each concept they are its own classes plus those of the
+concepts its source relates it to directly that relate to no other concept of its kind,
+such as an ingredient's single-ingredient products; a combination product's classes are
+never attributed to one of its ingredients. Classes are never carried across sources;
+`source` says which one assigned each. `concept` is the first concept with classes (or the
+best match), or `null` if nothing matched. `classes` is empty unless an installed source
+provides classes: openFDA (`fda_epc`, `fda_moa`, `fda_pe`, `fda_cs`) and A-Z India
+(`therapeutic_class`, `action_class`, `chemical_class`) do; RxNorm does not.
 
 ## `gurd database`
 
@@ -161,7 +171,7 @@ installed source provides drug classes. RxNorm Current Prescribable Content does
   "database": {
     "path": "/home/user/.local/share/gurd/gurd.db",
     "installed": true,
-    "schema_version": 1,
+    "schema_version": 2,
     "built_at": "2026-10-03T12:44:02Z",
     "built_by": "gurd 0.1.0",
     "sources": [ { "...source record...": "" } ]
@@ -186,6 +196,7 @@ and the exit status is 1.
 | `origin` | `builtin` (an adapter in gurd) or `bundle` (a user-supplied dataset) |
 | `redistributable` | Whether the dataset's terms allow sharing a database built from it |
 | `age_days`, `stale_after_days`, `stale` | Days since the release, the age at which it counts as outdated, and whether it is |
+| `notice` | A caveat to show with the source's data (e.g. that it is an unofficial scrape), or `null` |
 
 ## `gurd sources`
 
@@ -222,7 +233,23 @@ where the provider publishes checksums for you to check against. Either may be `
 }
 ```
 
-If the release in the file is already installed, the database is left as it is:
-`imported` is empty and `up_to_date` lists `{ "source", "version" }` for that release.
+`imported` lists every source in the new database: the one being updated and the
+installed sources rebuilt with it from their stored releases. If the release in the file
+is already installed, the database is left as it is: `imported` is empty and
+`up_to_date` lists `{ "source", "version" }` for that release.
 Progress messages go to stderr. Without `--md5`, stderr also shows the file's MD5 and
 SHA-256 so you can compare them with the provider's published checksum.
+
+## `gurd remove <source>`
+
+```json
+{
+  "json_version": 1,
+  "database": "/home/user/.local/share/gurd/gurd.db",
+  "removed": "1mg",
+  "sources": [{ "source": "rxnorm", "version": "2026-09-08" }]
+}
+```
+
+`sources` lists the sources the rebuilt database holds; it is empty when the removed
+source was the last one (the old database is then kept as `<db>.bak`).

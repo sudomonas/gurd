@@ -38,10 +38,15 @@ pub struct Identifier {
     pub value: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Attribute {
     pub key: String,
+    /// Display label declared by the source, or the key itself.
+    pub label: String,
     pub value: String,
+    /// Shown on the summary page as well as in the detailed view.
+    #[serde(skip)]
+    pub summary: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -77,6 +82,48 @@ pub fn classes(db: &Database, concept: &ConceptRef) -> Result<Vec<Class>> {
          JOIN sources s ON s.id = cc.source_id
          WHERE cc.concept_id = ?1
          ORDER BY cl.system, cl.code",
+    )?;
+    let rows = stmt.query_map([concept.id], |r| {
+        Ok(Class {
+            system: r.get(0)?,
+            code: r.get(1)?,
+            name: r.get(2)?,
+            source: r.get(3)?,
+            source_version: r.get(4)?,
+        })
+    })?;
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
+/// Classes of a concept and of the concepts its source relates it to directly that relate
+/// to no other concept of its kind (an ingredient's single-ingredient products, say), so
+/// a combination product's classes are never attributed to one of its ingredients. Only
+/// the concept's own source is consulted: classes are never carried across sources.
+pub fn classes_for(db: &Database, concept: &ConceptRef) -> Result<Vec<Class>> {
+    let any: bool = db
+        .connection()
+        .prepare_cached(
+            "SELECT EXISTS (SELECT 1 FROM classifications
+                        WHERE source_id = (SELECT source_id FROM concepts WHERE id = ?1))",
+        )?
+        .query_row([concept.id], |r| r.get(0))?;
+    if !any {
+        return Ok(Vec::new());
+    }
+    let mut stmt = db.connection().prepare_cached(
+        "SELECT DISTINCT cl.system, cl.code, cl.name, s.slug, s.version
+         FROM (SELECT ?1 AS id
+               UNION SELECT r.object_id FROM relationships r
+                     WHERE r.subject_id = ?1
+                       AND r.source_id = (SELECT source_id FROM concepts WHERE id = ?1)
+                       AND (SELECT count(DISTINCT r2.object_id)
+                            FROM relationships r2 JOIN concepts c2 ON c2.id = r2.object_id
+                            WHERE r2.subject_id = r.object_id
+                              AND c2.kind = (SELECT kind FROM concepts WHERE id = ?1)) = 1) x
+         JOIN concept_classifications cc ON cc.concept_id = x.id
+         JOIN classifications cl ON cl.id = cc.classification_id
+         JOIN sources s ON s.id = cc.source_id
+         ORDER BY cl.system, cl.name",
     )?;
     let rows = stmt.query_map([concept.id], |r| {
         Ok(Class {
@@ -154,16 +201,16 @@ pub fn sections(db: &Database, concept: &ConceptRef) -> Result<BTreeMap<Section,
     // ingredients) before longer ones, then natural order: "metformin hydrochloride 500 MG
     // Oral Tablet" comes before the combination products.
     let own = normalize(&concept.name);
-    let key = |c: &ConceptRef| {
-        let leads = normalize(&c.name).starts_with(&own);
-        (!leads, c.name.split_whitespace().count())
-    };
     for items in sections.values_mut() {
-        items.sort_by(|a, b| {
-            key(a)
-                .cmp(&key(b))
-                .then_with(|| natural_cmp(&a.name, &b.name))
-        });
+        let mut keyed: Vec<((bool, usize), ConceptRef)> = std::mem::take(items)
+            .into_iter()
+            .map(|c| {
+                let leads = normalize(&c.name).starts_with(&own);
+                ((!leads, c.name.split_whitespace().count()), c)
+            })
+            .collect();
+        keyed.sort_by(|(ka, a), (kb, b)| ka.cmp(kb).then_with(|| natural_cmp(&a.name, &b.name)));
+        *items = keyed.into_iter().map(|(_, c)| c).collect();
     }
     Ok(sections)
 }
@@ -231,17 +278,7 @@ pub fn details(db: &Database, concept: ConceptRef) -> Result<Details> {
         })?
         .collect::<rusqlite::Result<_>>()?;
 
-    let attributes = conn
-        .prepare_cached(
-            "SELECT key, value FROM attributes WHERE concept_id = ?1 ORDER BY key, value",
-        )?
-        .query_map([id], |r| {
-            Ok(Attribute {
-                key: r.get(0)?,
-                value: r.get(1)?,
-            })
-        })?
-        .collect::<rusqlite::Result<_>>()?;
+    let attributes = attributes(db, id)?;
 
     let sql = format!(
         "SELECT {CONCEPT_COLUMNS}, r.predicate
@@ -271,6 +308,128 @@ pub fn details(db: &Database, concept: ConceptRef) -> Result<Details> {
         attributes,
         relationships,
     })
+}
+
+/// One record on a page, and the identifier that linked it to the records found by name.
+#[derive(Debug, Clone)]
+pub struct PageEntry {
+    pub concept: ConceptRef,
+    pub via: Option<String>,
+}
+
+/// Linked records of one source left off a page.
+#[derive(Debug, Clone)]
+pub struct Omitted {
+    pub source: String,
+    pub count: usize,
+}
+
+/// Everything a page shows for a lookup: the records found (`primary`) and the records of
+/// other sources linked to them by a shared identifier, at most `per_source` per source
+/// and identifier. With `same_kind_only`, only linked records of the same kind as the
+/// record they link to are shown (e.g. ingredient to ingredient); the rest are counted
+/// as omitted.
+pub fn page(
+    db: &Database,
+    primary: Vec<ConceptRef>,
+    per_source: usize,
+    same_kind_only: bool,
+) -> Result<(Vec<PageEntry>, Vec<Omitted>)> {
+    let mut entries: Vec<PageEntry> = Vec::new();
+    for c in primary {
+        if !entries.iter().any(|e| e.concept.id == c.id) {
+            entries.push(PageEntry {
+                concept: c,
+                via: None,
+            });
+        }
+    }
+    let mut omitted: Vec<Omitted> = Vec::new();
+    let mut omitted_ids = std::collections::HashSet::new();
+    let mut counts: BTreeMap<(String, String), usize> = BTreeMap::new();
+    for i in 0..entries.len() {
+        if entries[i].via.is_some() {
+            continue;
+        }
+        for (c, via) in linked(db, &entries[i].concept.clone())? {
+            if entries.iter().any(|e| e.concept.id == c.id) {
+                continue;
+            }
+            let wanted = !same_kind_only || c.kind == entries[i].concept.kind;
+            let n = counts.entry((c.source.clone(), via.clone())).or_default();
+            if wanted && *n < per_source {
+                *n += 1;
+                omitted_ids.remove(&c.id);
+                entries.push(PageEntry {
+                    concept: c,
+                    via: Some(via),
+                });
+            } else if omitted_ids.insert(c.id) {
+                match omitted.iter_mut().find(|o| o.source == c.source) {
+                    Some(o) => o.count += 1,
+                    None => omitted.push(Omitted {
+                        source: c.source.clone(),
+                        count: 1,
+                    }),
+                }
+            }
+        }
+    }
+    Ok((entries, omitted))
+}
+
+/// A concept's attributes in display order, with the labels its source declared.
+/// Values of one key keep the order the source listed them in.
+pub fn attributes(db: &Database, concept_id: i64) -> Result<Vec<Attribute>> {
+    let rows = db
+        .connection()
+        .prepare_cached(
+            "SELECT a.key, COALESCE(k.label, a.key), a.value, COALESCE(k.summary, 0)
+             FROM attributes a
+             LEFT JOIN attribute_keys k ON k.source_id = a.source_id AND k.key = a.key
+             WHERE a.concept_id = ?1
+             ORDER BY COALESCE(k.rank, 1000000), a.key, a.id",
+        )?
+        .query_map([concept_id], |r| {
+            Ok(Attribute {
+                key: r.get(0)?,
+                label: r.get(1)?,
+                value: r.get(2)?,
+                summary: r.get(3)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
+}
+
+/// Identifier systems through which records of different sources are linked. Each is an
+/// identifier the sources themselves assert; nothing is linked by name.
+pub const LINKING_SYSTEMS: &str = "'rxcui', 'unii'";
+
+/// Concepts of other sources that share a linking identifier with `concept`, each with the
+/// identifier (`system:value`) that links it.
+pub fn linked(db: &Database, concept: &ConceptRef) -> Result<Vec<(ConceptRef, String)>> {
+    let sql = format!(
+        "SELECT {CONCEPT_COLUMNS}, i2.system || ':' || i2.value
+         FROM identifiers i1
+         JOIN identifiers i2 ON i2.system = i1.system AND i2.value = i1.value
+         JOIN concepts c ON c.id = i2.concept_id {CONCEPT_JOINS}
+         WHERE i1.concept_id = ?1 AND i1.system IN ({LINKING_SYSTEMS})
+           AND c.source_id <> (SELECT source_id FROM concepts WHERE id = ?1)
+         ORDER BY s.slug, k.rank, c.name"
+    );
+    let mut out: Vec<(ConceptRef, String)> = Vec::new();
+    let mut stmt = db.connection().prepare_cached(&sql)?;
+    let rows = stmt.query_map([concept.id], |r| {
+        Ok((concept_from_row(r)?, r.get::<_, String>(9)?))
+    })?;
+    for row in rows {
+        let (c, via) = row?;
+        if !out.iter().any(|(o, _)| o.id == c.id) {
+            out.push((c, via));
+        }
+    }
+    Ok(out)
 }
 
 /// Case-insensitive ordering that compares digit runs as numbers, so

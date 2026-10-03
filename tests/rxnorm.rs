@@ -213,6 +213,7 @@ fn rejects_malformed_rows() {
             source: &RxNorm,
             input: &input,
             upstream_checksum: None,
+            retrieved_at: None,
         }],
     )
     .unwrap_err();

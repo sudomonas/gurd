@@ -57,18 +57,94 @@ The full RxNorm release requires a UMLS license and includes proprietary sources
 restrictions under section 12 of the UMLS license agreement. `gurd` does not support it,
 and a database built from it must not be redistributed.
 
+## openFDA NDC Directory
+
+| | |
+|---|---|
+| Dataset | NDC Directory, as exported by openFDA (`drug-ndc-0001-of-0001.json.zip`) |
+| Provider | U.S. Food and Drug Administration |
+| Source | <https://open.fda.gov/apis/drug/ndc/> |
+| Version | The export's `meta.last_updated` date (e.g. `2026-10-02`); updated daily |
+| License/terms | [CC0 1.0 Universal](https://open.fda.gov/license/). openFDA asks users not to imply endorsement. openFDA excludes GMDN medical-device terminology from CC0; that concerns device data, not the drug NDC export |
+| Attribution | Not required; `gurd` credits openFDA and states that the FDA does not endorse it |
+| Redistribution conditions | Allowed |
+| Download URL | <https://download.open.fda.gov/drug/ndc/drug-ndc-0001-of-0001.json.zip> (listed in <https://api.fda.gov/download.json>) |
+| Checksum | None published; `gurd` records the file's SHA-256 |
+
+openFDA's own disclaimer, shown by `gurd` on every openFDA record: "Do not rely on openFDA
+to make decisions regarding medical care. [...] you should assume all results are
+unvalidated."
+
+## RxTerms
+
+| | |
+|---|---|
+| Dataset | RxTerms |
+| Provider | U.S. National Library of Medicine, Lister Hill National Center for Biomedical Communications |
+| Source | <https://lhncbc.nlm.nih.gov/MOR/RxTerms/> |
+| Version | Monthly, from the file name (`RxTerms202609.txt` → `2026-09`); `gurd` dates it to the first of that month |
+| License/terms | NLM states RxTerms is "free to use". No explicit redistribution terms are published, so `gurd` treats it as **local-only** |
+| Attribution | `gurd` credits NLM |
+| Redistribution conditions | Unclear; do not redistribute databases containing it |
+| Download URL | `https://data.lhncbc.nlm.nih.gov/public/rxterms/release/RxTerms<YYYYMM>.zip` |
+| Checksum | None published |
+
+## 1mg medicines (third-party Kaggle scrape)
+
+| | |
+|---|---|
+| Dataset | JSON-lines files `kaggle_medicines.json`, `kaggle_capsules.json`, `kaggle_injections.json` (about 117,000 products) |
+| Provider | **Unofficial.** Scraped from 1mg.com (Tata 1mg) by a third party and published on Kaggle |
+| Version | None in the data; `gurd` uses the files' modification date |
+| License/terms | **None.** Whether 1mg permits the scraping is unknown and its terms may forbid it. Use for personal reference only |
+| Attribution | `gurd` names 1mg.com as the original publisher |
+| Redistribution conditions | **Do not redistribute** the files or any database built from them. `gurd` never downloads them; you supply your own copy with `--from` |
+| Download URL | None (Kaggle, with your own account) |
+| Checksum | None; `gurd` records the SHA-256 of the directory's files |
+
+Prices, uses, side effects and descriptions are shown exactly as they appear in the
+files. They were written by an online pharmacy, are not a prescribing reference, and may
+be out of date.
+
+## A-Z Medicines Dataset of India (third-party Kaggle scrape)
+
+| | |
+|---|---|
+| Dataset | One CSV file, a row per product (about 248,000), with substitutes, side effects, uses, and chemical, therapeutic and action classes |
+| Provider | **Unofficial.** Compiled by a third party from Indian online pharmacy listings and published on Kaggle |
+| Version | None in the data; `gurd` uses the file's modification date |
+| License/terms | **None stated by the original publishers.** Use for personal reference only |
+| Attribution | `gurd` names the dataset |
+| Redistribution conditions | **Do not redistribute.** You supply your own copy with `--from` |
+| Download URL | None (Kaggle, with your own account) |
+| Checksum | None |
+
+## Test fixtures
+
+The repository contains small test fixtures. RxNorm and openFDA fixtures are real rows
+copied unedited (public domain and CC0). Fixtures for RxTerms, 1mg and the A-Z India
+dataset are **made up** in those datasets' formats, because their terms do not allow
+redistribution.
+
 ## Datasets not supported yet
 
-These are candidates for future adapters. None is downloaded, bundled or redistributed by
-`gurd` today. Terms were last checked on 2026-10-03 against the providers' own pages.
+None of these is downloaded, bundled or redistributed by `gurd` today. Terms were last
+checked on 2026-10-03 against the providers' own pages, where those could be reached.
 
 | Dataset | Provider | Status of terms | Plan |
 |---|---|---|---|
-| RxTerms | NLM Lister Hill Center | [Project page](https://lhncbc.nlm.nih.gov/MOR/RxTerms/) says it is free to use; no explicit redistribution terms found | User download only; no redistribution until terms are confirmed |
-| ATC/DDD | WHO Collaborating Centre for Drug Statistics Methodology | [Copyright notice](https://atcddd.fhi.no/copyright_disclaimer/): "Copying and distribution for commercial purposes is not allowed. Changing or manipulating the material is not allowed." | Never bundled. Even a local import may count as manipulation; needs a separate legal review |
-| openFDA (e.g. NDC directory) | U.S. Food and Drug Administration | Provider states CC0, with some third-party content excluded and marked | To be re-checked when work starts |
-| DailyMed | NLM / FDA | Not verified | To be checked before any work starts |
+| India Drug Registry | ABDM / CDSCO / NRCeS | Not stated on the portal. Bulk export is behind a CAPTCHA, meaning it is intended for people using the portal | Import a file you export from the portal; or an API connector using your own ABDM integrator credentials |
+| NLEM 2022 (National List of Essential Medicines) | Ministry of Health, India | Government publication; terms not checked (the CDSCO site refuses automated access) | Import the PDF you download |
+| CDSCO approved drug lists | CDSCO | Government publication; terms not checked | Import the PDFs you download |
+| Jan Aushadhi product list | PMBI | "All Rights Reserved" | Personal use only, from the PDF you export |
+| ICMR Standard Treatment Workflows, MoHFW Standard Treatment Guidelines | ICMR, MoHFW | Government publications; terms not checked | A document store with `gurd guide`, quoting pages verbatim |
+| WHO Model List of Essential Medicines (eEML) | WHO | CC BY 3.0 IGO, attribution required | Download format still to be confirmed |
+| DailyMed (label text) | NLM / FDA | Not verified; labels are written by manufacturers | Opt-in, from a file you download (several GB) |
+| ChEMBL | EMBL-EBI | CC BY-SA 3.0 (share-alike) | Opt-in, from the SQLite dump (5.4 GB) |
+| Wikidata | Wikimedia | CC0 | International generic names; to be added |
+| ATC/DDD | WHO Collaborating Centre for Drug Statistics Methodology | "Copying and distribution for commercial purposes is not allowed. Changing or manipulating the material is not allowed." | Never bundled; needs legal review even for local import |
+| National Formulary of India, MIMS/CIMS | IPC; commercial publishers | Sold or by subscription; no free copy exists | Only through a licensed export you own, imported locally |
 
 If a dataset's terms are ambiguous, `gurd` will not redistribute it; at most it will let
-users download it from the official source themselves, and this file will state the
+users import their own copy from the official source, and this file will state the
 limitation.

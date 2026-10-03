@@ -36,6 +36,7 @@ impl Source for Fake {
             stale_after_days: None,
             download_url: None,
             checksums_url: None,
+            notice: None,
         }
     }
     fn release(&self, _: &Input) -> Result<Release> {
@@ -78,6 +79,7 @@ fn install(dest: &Path, dir: &Path, b: Behaviour) -> Result<()> {
             source: &Fake(b),
             input: &input,
             upstream_checksum: None,
+            retrieved_at: None,
         }],
     )
     .map(drop)
@@ -249,6 +251,7 @@ fn navigation_with_unknown_predicate_fails_validation() {
             source: &BadNavigation,
             input: &input,
             upstream_checksum: None,
+            retrieved_at: None,
         }],
     )
     .unwrap_err();

@@ -21,6 +21,8 @@ pub struct Job<'a> {
     pub input: &'a Input,
     /// Provider-published checksum the input was verified against, e.g. `md5:...`.
     pub upstream_checksum: Option<String>,
+    /// When the input was obtained (ISO 8601), if known; defaults to the file's time.
+    pub retrieved_at: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -73,11 +75,11 @@ pub fn build(path: &Path, jobs: &[Job]) -> Result<Vec<Imported>> {
         tx.execute(
             "INSERT INTO sources (stale_after_days, slug, title, code_system, provider, version, release_date, license,
                  attribution, url, file_name, upstream_checksum, sha256, retrieved_at,
-                 imported_at, importer_version, origin, redistributable)
+                 imported_at, importer_version, origin, redistributable, notice)
              VALUES (?15, ?1, ?2, ?14, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?16, ?10,
-                 COALESCE(strftime('%Y-%m-%dT%H:%M:%SZ', ?11, 'unixepoch'),
+                 COALESCE(?17, strftime('%Y-%m-%dT%H:%M:%SZ', ?11, 'unixepoch'),
                           strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-                 strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), ?12, 'builtin', ?13)",
+                 strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), ?12, 'builtin', ?13, ?18)",
             params![
                 info.slug,
                 info.title,
@@ -95,6 +97,8 @@ pub fn build(path: &Path, jobs: &[Job]) -> Result<Vec<Imported>> {
                 info.code_system,
                 info.stale_after_days,
                 job.upstream_checksum,
+                job.retrieved_at,
+                info.notice,
             ],
         )?;
         let source_id = tx.last_insert_rowid();
@@ -343,6 +347,51 @@ impl ImportSink<'_> {
                 path.join(" "),
                 to.as_str()
             ])?;
+        Ok(())
+    }
+
+    /// Declares how attribute `key` is displayed: its label, its position (lower first)
+    /// and whether the summary page shows it.
+    pub fn attribute_key(
+        &mut self,
+        key: &str,
+        label: &str,
+        rank: i64,
+        summary: bool,
+    ) -> Result<()> {
+        self.conn
+            .prepare_cached(
+                "INSERT OR REPLACE INTO attribute_keys (source_id, key, label, rank, summary)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+            )?
+            .execute(params![self.source_id, key, label, rank, summary])?;
+        Ok(())
+    }
+
+    /// Adds (or finds) a class in a classification system; returns its id.
+    pub fn classification(&mut self, system: &str, code: &str, name: &str) -> Result<i64> {
+        self.conn
+            .prepare_cached(
+                "INSERT OR IGNORE INTO classifications (source_id, system, code, name)
+                 VALUES (?1, ?2, ?3, ?4)",
+            )?
+            .execute(params![self.source_id, system, code, name])?;
+        Ok(self
+            .conn
+            .prepare_cached(
+                "SELECT id FROM classifications WHERE source_id = ?1 AND system = ?2 AND code = ?3",
+            )?
+            .query_row(params![self.source_id, system, code], |r| r.get(0))?)
+    }
+
+    /// Records that the source assigns `concept_id` to a class.
+    pub fn classify(&mut self, concept_id: i64, classification_id: i64) -> Result<()> {
+        self.conn
+            .prepare_cached(
+                "INSERT OR IGNORE INTO concept_classifications (concept_id, classification_id, source_id)
+                 VALUES (?1, ?2, ?3)",
+            )?
+            .execute(params![concept_id, classification_id, self.source_id])?;
         Ok(())
     }
 

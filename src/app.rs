@@ -36,6 +36,7 @@ pub fn run(cli: Cli) -> Result<ExitCode> {
         Some(Command::Class { ref query }) => class(&cli, &query.join(" ")),
         Some(Command::Sources) => list_sources(&cli),
         Some(Command::Update(ref args)) => update(&cli, args),
+        Some(Command::Remove { ref source }) => remove(&cli, source),
     }
 }
 
@@ -99,24 +100,88 @@ fn find(cli: &Cli, args: &SearchArgs) -> Result<ExitCode> {
 
     match hits.first() {
         None => eprintln!("gurd: no match for \"{query}\""),
-        // An exact match gets the summary card; anything else gets the list.
+        // An exact match gets the summary page; anything else gets the list.
         Some(top) if top.matched == Match::Exact => {
-            let sections = details::sections(&db, &top.concept)?;
-            let shown: HashSet<i64> = sections.values().flatten().map(|c| c.id).collect();
-            let others: Vec<Hit> = hits[1..]
+            let mut exact: Vec<ConceptRef> = hits
+                .iter()
+                .filter(|h| h.matched == Match::Exact)
+                .map(|h| h.concept.clone())
+                .collect();
+            by_source_order(&mut exact);
+            let (entries, omitted) = details::page(&db, exact, LINKED_ON_SUMMARY, true)?;
+            let mut sections = Vec::new();
+            let mut attributes = Vec::new();
+            let mut classes = Vec::new();
+            // Records shown one per line (several of one source and kind) need no sections.
+            let listed: Vec<bool> = entries
+                .iter()
+                .map(|e| {
+                    e.via.is_none()
+                        && entries
+                            .iter()
+                            .filter(|o| {
+                                o.via.is_none()
+                                    && o.concept.source == e.concept.source
+                                    && o.concept.kind == e.concept.kind
+                            })
+                            .count()
+                            > 1
+                })
+                .collect();
+            for (e, &listed) in entries.iter().zip(&listed) {
+                if listed {
+                    sections.push(Default::default());
+                    attributes.push(details::attributes(&db, e.concept.id)?);
+                    classes.push(Vec::new());
+                    continue;
+                }
+                sections.push(details::sections(&db, &e.concept)?);
+                attributes.push(details::attributes(&db, e.concept.id)?);
+                // A record's own classes are among its attributes already; list only
+                // those of the records its source relates it to (an ingredient's products).
+                let own = details::classes(&db, &e.concept)?;
+                let mut related = details::classes_for(&db, &e.concept)?;
+                related.retain(|c| !own.iter().any(|o| o.system == c.system && o.code == c.code));
+                classes.push(related);
+            }
+            let shown: HashSet<i64> = entries
+                .iter()
+                .map(|e| e.concept.id)
+                .chain(
+                    sections
+                        .iter()
+                        .flat_map(|m| m.values().flatten().map(|c| c.id)),
+                )
+                .collect();
+            let others: Vec<Hit> = hits
                 .iter()
                 .filter(|h| !shown.contains(&h.concept.id))
                 .take(5)
                 .cloned()
                 .collect();
-            let source = sources.iter().find(|s| s.slug == top.concept.source);
-            output::emit(&render::card(
-                &top.concept,
-                &sections,
+            let records: Vec<render::Summary> = entries
+                .iter()
+                .zip(&sections)
+                .zip(&attributes)
+                .zip(&classes)
+                .map(
+                    |(((entry, sections), attributes), classes)| render::Summary {
+                        entry,
+                        sections,
+                        attributes,
+                        classes,
+                    },
+                )
+                .collect();
+            let text = render::summary_page(
+                &top.concept.name,
+                &records,
+                &omitted,
                 &others,
-                source,
+                &sources,
                 style(cli),
-            ))?;
+            );
+            output::page(&text, !cli.global.no_pager)?;
         }
         Some(_) => {
             output::emit(&render::hits(&hits, style(cli)))?;
@@ -126,28 +191,57 @@ fn find(cli: &Cli, args: &SearchArgs) -> Result<ExitCode> {
                     args.limit
                 );
             }
+            eprintln!("gurd: no exact match; `gurd show {query}` shows the best match in full");
         }
     }
     Ok(exit(!hits.is_empty()))
 }
 
-/// `gurd show QUERY`: details of the best match, or of every concept with a given
-/// identifier when QUERY looks like `system:value`.
+/// Orders records by source, in the order of `sources::builtin()` (official sources
+/// first), keeping the search ranking within a source.
+fn by_source_order(concepts: &mut [ConceptRef]) {
+    let order: Vec<String> = sources::builtin().iter().map(|s| s.info().slug).collect();
+    concepts.sort_by_key(|c| {
+        order
+            .iter()
+            .position(|s| *s == c.source)
+            .unwrap_or(usize::MAX)
+    });
+}
+
+/// Linked records shown per source and identifier: on the summary page, and in full.
+const LINKED_ON_SUMMARY: usize = 3;
+const LINKED_IN_DETAILS: usize = 20;
+
+/// `gurd show QUERY`: the full page for the best match and every other record with the
+/// same name, plus linked records; or for every record with an identifier when QUERY
+/// looks like `system:value`.
 fn show(cli: &Cli, query: &str) -> Result<ExitCode> {
     if let Some((system, value)) = details::parse_identifier(query) {
         return lookup_identifier(cli, query, &system, value);
     }
     let db = open(cli)?;
-    let hits = search::search(&db, query, 1)?;
-    if let Some(hit) = hits.first() {
+    let best = search::search(&db, query, 1)?;
+    let mut concepts = Vec::new();
+    if let Some(hit) = best.first() {
         if hit.matched == Match::Fuzzy && !cli.global.json {
             eprintln!("gurd: no match for \"{query}\"; showing the closest name");
+        }
+        // Every record named exactly like the best match, from any source.
+        concepts = search::search(&db, &hit.concept.name, 0)?
+            .into_iter()
+            .filter(|h| h.matched == Match::Exact)
+            .map(|h| h.concept)
+            .collect();
+        if !concepts.iter().any(|c| c.id == hit.concept.id) {
+            concepts.insert(0, hit.concept.clone());
         }
     } else if !cli.global.json {
         eprintln!("gurd: no match for \"{query}\"");
     }
-    let concepts = hits.into_iter().map(|h| h.concept).collect();
-    print_details(cli, &db, query, concepts)
+    let title = concepts.first().map(|c| c.name.clone()).unwrap_or_default();
+    by_source_order(&mut concepts);
+    print_details(cli, &db, query, &title, concepts)
 }
 
 fn lookup_identifier(cli: &Cli, query: &str, system: &str, value: &str) -> Result<ExitCode> {
@@ -156,20 +250,23 @@ fn lookup_identifier(cli: &Cli, query: &str, system: &str, value: &str) -> Resul
     if concepts.is_empty() && !cli.global.json {
         eprintln!("gurd: nothing has the identifier {system}:{value}");
     }
-    print_details(cli, &db, query, concepts)
+    let title = concepts.first().map(|c| c.name.clone()).unwrap_or_default();
+    print_details(cli, &db, query, &title, concepts)
 }
 
 fn print_details(
     cli: &Cli,
     db: &Database,
     query: &str,
+    title: &str,
     concepts: Vec<ConceptRef>,
 ) -> Result<ExitCode> {
     let found = !concepts.is_empty();
     let sources = db.sources()?;
-    let all: Vec<Details> = concepts
+    let (entries, omitted) = details::page(db, concepts, LINKED_IN_DETAILS, false)?;
+    let all: Vec<(details::PageEntry, Details)> = entries
         .into_iter()
-        .map(|c| details::details(db, c))
+        .map(|e| Ok((e.clone(), details::details(db, e.concept)?)))
         .collect::<Result<_>>()?;
 
     if cli.global.json {
@@ -178,24 +275,17 @@ fn print_details(
             json_version: u32,
             query: &'a str,
             sources: Vec<SourceVersion>,
-            concepts: &'a [Details],
+            concepts: Vec<&'a Details>,
         }
         output::emit_json(&Doc {
             json_version: JSON_VERSION,
             query,
             sources: source_versions(&sources),
-            concepts: &all,
+            concepts: all.iter().map(|(_, d)| d).collect(),
         })?;
     } else if found {
-        let style = style(cli);
-        let text: Vec<String> = all
-            .iter()
-            .map(|d| {
-                let source = sources.iter().find(|s| s.slug == d.concept.source);
-                render::details(d, source, style)
-            })
-            .collect();
-        output::page(&text.join("\n"), !cli.global.no_pager)?;
+        let text = render::details_page(title, &all, &omitted, &sources, style(cli));
+        output::page(&text, !cli.global.no_pager)?;
     }
     Ok(exit(found))
 }
@@ -357,6 +447,48 @@ fn update(cli: &Cli, args: &UpdateArgs) -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+fn remove(cli: &Cli, slug: &str) -> Result<ExitCode> {
+    let path = config::database_path(cli.global.db.as_deref())?;
+    let mut log = |msg: &str| eprintln!("gurd: {msg}");
+    let imported = update::remove(&path, slug, &mut log)?;
+    if cli.global.json {
+        #[derive(Serialize)]
+        struct Doc<'a> {
+            json_version: u32,
+            database: String,
+            removed: &'a str,
+            sources: Vec<SourceVersion>,
+        }
+        output::emit_json(&Doc {
+            json_version: JSON_VERSION,
+            database: path.display().to_string(),
+            removed: slug,
+            sources: imported
+                .iter()
+                .map(|i| SourceVersion {
+                    source: i.slug.clone(),
+                    version: i.version.clone(),
+                })
+                .collect(),
+        })?;
+    } else if imported.is_empty() {
+        output::emit(&format!(
+            "Removed {slug}; no sources remain (the old database is kept as {}.bak)\n",
+            path.display()
+        ))?;
+    } else {
+        let rest: Vec<String> = imported
+            .iter()
+            .map(|i| format!("{} {}", i.slug, i.version))
+            .collect();
+        output::emit(&format!(
+            "Removed {slug}; the database now holds {}\n",
+            rest.join(", ")
+        ))?;
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
 fn available_sources() -> Vec<SourceInfo> {
     sources::builtin().iter().map(|s| s.info()).collect()
 }
@@ -434,23 +566,35 @@ fn list_sources(cli: &Cli) -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-/// `gurd class QUERY`: drug classes of the best match, from sources that provide them.
+/// `gurd class QUERY`: drug classes of every record matching QUERY exactly (or of the best
+/// match), from the sources that provide classes.
 fn class(cli: &Cli, query: &str) -> Result<ExitCode> {
     let db = open(cli)?;
     let sources = db.sources()?;
-    let concept = match details::parse_identifier(query) {
-        Some((system, value)) => details::by_identifier(&db, &system, value)?
-            .into_iter()
-            .next(),
-        None => search::search(&db, query, 1)?
-            .into_iter()
-            .next()
-            .map(|h| h.concept),
+    let mut concepts: Vec<ConceptRef> = match details::parse_identifier(query) {
+        Some((system, value)) => details::by_identifier(&db, &system, value)?,
+        None => {
+            let hits = search::search(&db, query, 0)?;
+            let exact: Vec<ConceptRef> = hits
+                .iter()
+                .filter(|h| h.matched == Match::Exact)
+                .map(|h| h.concept.clone())
+                .collect();
+            if exact.is_empty() {
+                hits.into_iter().take(1).map(|h| h.concept).collect()
+            } else {
+                exact
+            }
+        }
     };
-    let classes = match &concept {
-        Some(c) => details::classes(&db, c)?,
-        None => Vec::new(),
-    };
+    by_source_order(&mut concepts);
+    let mut found: Vec<(ConceptRef, Vec<details::Class>)> = Vec::new();
+    for c in &concepts {
+        let classes = details::classes_for(&db, c)?;
+        if !classes.is_empty() {
+            found.push((c.clone(), classes));
+        }
+    }
 
     if cli.global.json {
         #[derive(Serialize)]
@@ -459,25 +603,58 @@ fn class(cli: &Cli, query: &str) -> Result<ExitCode> {
             query: &'a str,
             sources: Vec<SourceVersion>,
             concept: Option<&'a ConceptRef>,
-            classes: &'a [details::Class],
+            classes: Vec<&'a details::Class>,
         }
         output::emit_json(&Doc {
             json_version: JSON_VERSION,
             query,
             sources: source_versions(&sources),
-            concept: concept.as_ref(),
-            classes: &classes,
+            concept: found.first().map(|(c, _)| c).or(concepts.first()),
+            classes: found.iter().flat_map(|(_, cl)| cl).collect(),
         })?;
     } else if !details::has_classifications(&db)? {
         eprintln!("gurd: no installed source provides drug classes");
-    } else if let Some(c) = &concept {
-        if classes.is_empty() {
-            eprintln!("gurd: no drug classes recorded for {}", c.name);
-        } else {
-            output::emit(&render::classes(c, &classes, style(cli)))?;
-        }
-    } else {
+    } else if concepts.is_empty() {
         eprintln!("gurd: no match for \"{query}\"");
+    } else if found.is_empty() {
+        eprintln!("gurd: no drug classes recorded for {}", concepts[0].name);
+    } else {
+        // One list per source: many records of a source (products with the same name)
+        // usually share their classes.
+        let mut text = Vec::new();
+        let mut i = 0;
+        while i < found.len() {
+            let source = found[i].0.source.clone();
+            let group: Vec<&(ConceptRef, Vec<details::Class>)> = found[i..]
+                .iter()
+                .take_while(|(c, _)| c.source == source)
+                .collect();
+            let mut classes: Vec<&details::Class> = Vec::new();
+            for (_, cl) in &group {
+                for c in cl {
+                    if !classes
+                        .iter()
+                        .any(|x| x.system == c.system && x.code == c.code)
+                    {
+                        classes.push(c);
+                    }
+                }
+            }
+            classes.sort_by(|a, b| (&a.system, &a.name).cmp(&(&b.system, &b.name)));
+            let title = sources
+                .iter()
+                .find(|s| s.slug == source)
+                .map_or(source.as_str(), |s| s.title.as_str());
+            text.push(render::classes(
+                title,
+                &group[0].0,
+                group.len(),
+                &classes,
+                style(cli),
+            ));
+            i += group.len();
+        }
+        output::emit(&text.join("\n"))?;
     }
-    Ok(exit(!classes.is_empty()))
+    Ok(exit(!found.is_empty()))
 }

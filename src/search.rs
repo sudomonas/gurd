@@ -6,7 +6,8 @@
 //! 1. `exact`     the normalized name equals the normalized query
 //! 2. `prefix`    a name starts with the query
 //! 3. `token`     every query word occurs as a word of a name (the last one as a prefix)
-//! 4. `substring` a name contains the query (three characters or more)
+//! 4. `substring` a name contains the query (three characters or more); skipped when
+//!    there is an exact match
 //! 5. `fuzzy`     the closest ingredient or brand names by edit distance; only tried
 //!    when nothing else matched
 //!
@@ -54,14 +55,17 @@ pub fn search(db: &Database, query: &str, limit: usize) -> Result<Vec<Hit>> {
         return Ok(Vec::new());
     }
     let limit = if limit == 0 { usize::MAX } else { limit };
-    let mut hits = Vec::new();
+    let mut hits: Vec<Hit> = Vec::new();
     let mut seen = HashSet::new();
+    let upper = format!("{q}\u{10FFFF}");
 
     let tiers = [
         (Match::Exact, "n.norm = ?1", Some(q.clone())),
+        // Every string starting with q sorts between q and q + U+10FFFF. The bound is
+        // computed here: an expression in SQL would keep SQLite from using the index.
         (
             Match::Prefix,
-            "n.norm > ?1 AND n.norm < ?1 || char(1114111)",
+            "n.norm > ?1 AND n.norm < ?3",
             Some(q.clone()),
         ),
         (
@@ -81,7 +85,12 @@ pub fn search(db: &Database, query: &str, limit: usize) -> Result<Vec<Hit>> {
             break;
         }
         let want = limit.saturating_sub(hits.len()).saturating_add(seen.len());
-        for hit in tier_hits(db, tier, condition, &arg, want)? {
+        // Substring matching finds partial words; with an exact match it adds little and
+        // is the slowest tier on large databases.
+        if tier == Match::Substring && hits.first().is_some_and(|h| h.matched == Match::Exact) {
+            break;
+        }
+        for hit in tier_hits(db, tier, condition, &arg, &upper, want)? {
             if hits.len() >= limit {
                 break;
             }
@@ -102,6 +111,7 @@ fn tier_hits(
     tier: Match,
     condition: &str,
     arg: &str,
+    upper: &str,
     limit: usize,
 ) -> Result<Vec<Hit>> {
     // For each concept, one matching name stands for it: the preferred name if it
@@ -121,14 +131,22 @@ fn tier_hits(
     );
     let limit = i64::try_from(limit).unwrap_or(i64::MAX);
     let mut stmt = db.connection().prepare_cached(&sql)?;
-    let rows = stmt.query_map(params![arg, limit], |r| {
+    let row = |r: &rusqlite::Row| {
         Ok(Hit {
             concept: concept_from_row(r)?,
             matched: tier,
             matched_name: r.get(CONCEPT_COLUMN_COUNT)?,
         })
-    })?;
-    Ok(rows.collect::<rusqlite::Result<_>>()?)
+    };
+    // ?3 is only referenced by the prefix condition.
+    let rows = if condition.contains("?3") {
+        stmt.query_map(params![arg, limit, upper], row)?
+            .collect::<rusqlite::Result<_>>()?
+    } else {
+        stmt.query_map(params![arg, limit], row)?
+            .collect::<rusqlite::Result<_>>()?
+    };
+    Ok(rows)
 }
 
 fn fuzzy(db: &Database, q: &str, limit: usize) -> Result<Vec<Hit>> {

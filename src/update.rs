@@ -15,6 +15,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
+use rusqlite::{Connection, OpenFlags};
 
 use crate::database::Database;
 use crate::import::{self, Imported, Job};
@@ -103,6 +104,12 @@ fn verify_and_install(
     md5: Option<&str>,
     log: &mut dyn FnMut(&str),
 ) -> Result<Outcome> {
+    if md5.is_some() && file.is_dir() {
+        bail!(
+            "--md5 checks a single file; {} is a directory",
+            file.display()
+        );
+    }
     let checksum = match md5 {
         Some(expected) => {
             let actual = md5_file(file)?;
@@ -121,15 +128,17 @@ fn verify_and_install(
     let input = Input::open(file)?;
     if checksum.is_none() {
         let info = source.info();
-        let place = info
-            .checksums_url
-            .map(|u| format!(" with the checksum published at {u}"))
-            .unwrap_or_default();
-        log(&format!(
-            "not verified (no --md5): MD5 {}, SHA-256 {}; compare{place}",
-            md5_file(file)?,
-            input.sha256
-        ));
+        let hashes = if file.is_dir() {
+            format!("SHA-256 of the directory listing {}", input.sha256)
+        } else {
+            format!("MD5 {}, SHA-256 {}", md5_file(file)?, input.sha256)
+        };
+        let place = match info.checksums_url {
+            Some(u) => format!("; compare with the checksum published at {u}"),
+            None if info.redistributable => "; the provider publishes no checksum".to_owned(),
+            None => String::new(),
+        };
+        log(&format!("not verified (no --md5): {hashes}{place}"));
     }
 
     let release = source.release(&input)?;
@@ -141,15 +150,204 @@ fn verify_and_install(
         });
     }
 
-    let imported = import::install(
-        opts.dest,
-        &[Job {
-            source,
-            input: &input,
-            upstream_checksum: checksum,
-        }],
+    // Every installed source is rebuilt together, so their versions are recorded side by
+    // side in one database. The other sources are rebuilt from their stored releases.
+    let others = stored_sources(opts.dest, Some(&slug), log)?;
+    let staged = stage_release(opts.dest, &slug, file)?;
+    let mut jobs = vec![Job {
+        source,
+        input: &input,
+        upstream_checksum: checksum,
+        retrieved_at: None,
+    }];
+    jobs.extend(others.iter().map(StoredSource::job));
+    match import::install(opts.dest, &jobs) {
+        Ok(imported) => {
+            commit_release(opts.dest, &slug, &staged)?;
+            Ok(Outcome::Installed(imported))
+        }
+        Err(err) => {
+            let _ = remove_path(&staged);
+            Err(err)
+        }
+    }
+}
+
+/// Removes one source: rebuilds the database from the other installed sources. Removing
+/// the last source moves the database aside to `<db>.bak`.
+pub fn remove(dest: &Path, slug: &str, log: &mut dyn FnMut(&str)) -> Result<Vec<Imported>> {
+    if !stored_records(dest)?.iter().any(|r| r.slug == slug) {
+        bail!("{slug} is not installed");
+    }
+    let others = stored_sources(dest, Some(slug), log)?;
+    let imported = if others.is_empty() {
+        let mut bak = dest.as_os_str().to_owned();
+        bak.push(".bak");
+        fs::rename(dest, PathBuf::from(bak))
+            .with_context(|| format!("cannot move {} aside", dest.display()))?;
+        Vec::new()
+    } else {
+        let jobs: Vec<Job> = others.iter().map(StoredSource::job).collect();
+        import::install(dest, &jobs)?
+    };
+    let _ = remove_path(&releases_dir(dest).join(slug));
+    Ok(imported)
+}
+
+/// Where the release files of installed sources are kept, so the database can be rebuilt
+/// without downloading them again: `<db>.sources/<source>/<file>`.
+pub fn releases_dir(dest: &Path) -> PathBuf {
+    let mut name = dest.as_os_str().to_owned();
+    name.push(".sources");
+    PathBuf::from(name)
+}
+
+/// An installed source, reopened from its stored release.
+struct StoredSource {
+    source: Box<dyn Source>,
+    input: Input,
+    record: StoredRecord,
+}
+
+impl StoredSource {
+    fn job(&self) -> Job<'_> {
+        Job {
+            source: self.source.as_ref(),
+            input: &self.input,
+            upstream_checksum: self.record.upstream_checksum.clone(),
+            retrieved_at: Some(self.record.retrieved_at.clone()),
+        }
+    }
+}
+
+struct StoredRecord {
+    slug: String,
+    file_name: String,
+    upstream_checksum: Option<String>,
+    retrieved_at: String,
+}
+
+/// Source records of the installed database, read without the schema-version check so an
+/// older database can still be rebuilt. No database means no sources.
+fn stored_records(dest: &Path) -> Result<Vec<StoredRecord>> {
+    if !dest.exists() {
+        return Ok(Vec::new());
+    }
+    let conn = Connection::open_with_flags(dest, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let mut stmt = conn.prepare(
+        "SELECT slug, file_name, upstream_checksum, retrieved_at FROM sources ORDER BY slug",
     )?;
-    Ok(Outcome::Installed(imported))
+    let rows = stmt.query_map([], |r| {
+        Ok(StoredRecord {
+            slug: r.get(0)?,
+            file_name: r.get(1)?,
+            upstream_checksum: r.get(2)?,
+            retrieved_at: r.get(3)?,
+        })
+    })?;
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
+fn stored_sources(
+    dest: &Path,
+    except: Option<&str>,
+    log: &mut dyn FnMut(&str),
+) -> Result<Vec<StoredSource>> {
+    let records = match stored_records(dest) {
+        Ok(r) => r,
+        Err(err) => {
+            log(&format!(
+                "cannot read the installed database ({err}); it will be replaced"
+            ));
+            return Ok(Vec::new());
+        }
+    };
+    let mut out = Vec::new();
+    for record in records
+        .into_iter()
+        .filter(|r| Some(r.slug.as_str()) != except)
+    {
+        let Some(source) = crate::sources::find(&record.slug) else {
+            bail!(
+                "installed source {} is not supported by this build; remove it with `gurd remove {}`",
+                record.slug,
+                record.slug
+            );
+        };
+        let path = releases_dir(dest)
+            .join(&record.slug)
+            .join(&record.file_name);
+        if !path.exists() {
+            bail!(
+                "cannot rebuild {}: its release file is not stored at {}; \
+                 reinstall it with `gurd update --source {} --from FILE` or remove it with \
+                 `gurd remove {}`",
+                record.slug,
+                path.display(),
+                record.slug,
+                record.slug
+            );
+        }
+        log(&format!(
+            "rebuilding {} from {}",
+            record.slug,
+            path.display()
+        ));
+        let input = Input::open(&path)?;
+        out.push(StoredSource {
+            source,
+            input,
+            record,
+        });
+    }
+    Ok(out)
+}
+
+/// Copies a release into `<releases>/<slug>.new/` ahead of the build.
+fn stage_release(dest: &Path, slug: &str, file: &Path) -> Result<PathBuf> {
+    let staged = releases_dir(dest).join(format!("{slug}.new"));
+    let _ = remove_path(&staged);
+    fs::create_dir_all(&staged).with_context(|| format!("cannot create {}", staged.display()))?;
+    let name = file.file_name().unwrap_or_default();
+    copy_tree(file, &staged.join(name))
+        .with_context(|| format!("cannot store a copy of {}", file.display()))?;
+    Ok(staged)
+}
+
+/// Makes a staged release the stored release of `slug`.
+fn commit_release(dest: &Path, slug: &str, staged: &Path) -> Result<()> {
+    let target = releases_dir(dest).join(slug);
+    let _ = remove_path(&target);
+    fs::rename(staged, &target).with_context(|| format!("cannot store {}", target.display()))
+}
+
+/// Copies a file or directory, hard-linking files where possible.
+fn copy_tree(from: &Path, to: &Path) -> Result<()> {
+    if from.is_dir() {
+        fs::create_dir_all(to)?;
+        for entry in fs::read_dir(from)? {
+            let entry = entry?;
+            copy_tree(&entry.path(), &to.join(entry.file_name()))?;
+        }
+    } else if fs::hard_link(from, to).is_err() {
+        fs::copy(from, to)?;
+        // Keep the original time: some sources take their version from it.
+        if let Ok(modified) = fs::metadata(from).and_then(|m| m.modified()) {
+            let _ = fs::File::options()
+                .write(true)
+                .open(to)
+                .and_then(|f| f.set_modified(modified));
+        }
+    }
+    Ok(())
+}
+
+fn remove_path(path: &Path) -> std::io::Result<()> {
+    if path.is_dir() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    }
 }
 
 /// Installed release of `slug`, if a readable database exists.

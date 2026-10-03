@@ -55,7 +55,7 @@ fn database_installed_exits_0() {
     assert!(
         String::from_utf8(out.stdout)
             .unwrap()
-            .contains("Schema    1")
+            .contains("Schema    2")
     );
     assert!(out.stderr.is_empty());
 }
@@ -73,7 +73,7 @@ fn database_json_is_valid_and_quiet() {
         let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
         assert_eq!(v["json_version"], 1);
         assert_eq!(v["database"]["installed"], true);
-        assert_eq!(v["database"]["schema_version"], 1);
+        assert_eq!(v["database"]["schema_version"], 2);
         assert!(v["database"]["sources"].as_array().unwrap().is_empty());
     }
 }
@@ -219,8 +219,10 @@ fn stale_release_is_disclosed() {
     ] {
         let out = gurd(&db, args);
         let text = String::from_utf8(out.stdout).unwrap();
+        // Long lines are wrapped; compare with whitespace collapsed.
+        let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
         assert!(
-            text.contains("may not reflect the provider's latest data"),
+            flat.contains("may not reflect the provider's latest data"),
             "{args:?}: {text}"
         );
     }

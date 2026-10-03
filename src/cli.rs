@@ -115,11 +115,17 @@ pub enum Command {
 
     /// Download, import and install source datasets (uses the network)
     Update(UpdateArgs),
+
+    /// Remove an installed source and rebuild the database without it
+    Remove {
+        #[arg(value_name = "SOURCE")]
+        source: String,
+    },
 }
 
 #[derive(Debug, Args)]
 pub struct UpdateArgs {
-    /// Import from a local release file instead of downloading
+    /// Import from a local release file or directory instead of downloading
     #[arg(long, value_name = "FILE", conflicts_with = "url")]
     pub from: Option<PathBuf>,
 
@@ -127,7 +133,7 @@ pub struct UpdateArgs {
     #[arg(long, value_name = "URL")]
     pub url: Option<String>,
 
-    /// Source to update
+    /// Source to install or update (see `gurd sources`)
     #[arg(long, value_name = "SOURCE", default_value = "rxnorm")]
     pub source: String,
 

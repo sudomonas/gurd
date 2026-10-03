@@ -9,6 +9,34 @@ increment `json_version` and are marked **Breaking** here.
 
 ## [Unreleased]
 
+### Added
+
+- New sources: **openFDA NDC Directory** (`openfda`), **RxTerms** (`rxterms`), and two
+  unofficial Indian datasets for personal use: **1mg medicines** (`1mg`) and the
+  **A-Z Medicines Dataset of India** (`az-india`).
+- A database can hold several sources. Every `gurd update` rebuilds all installed sources
+  together from their stored release files (`gurd.db.sources/`), so versions are always
+  recorded side by side.
+- `gurd remove SOURCE` removes a source and rebuilds without it.
+- The lookup page: an exact match shows one page with a block per source (official sources
+  first), every record's fields with readable labels, related records, and records of
+  other sources linked by a shared RxCUI or UNII. Many same-name records of one source are
+  listed one per line. `gurd show` gives the full page for the best match.
+- `gurd class` gathers classes from all matching records, including the single-ingredient
+  products of an ingredient; openFDA and A-Z India provide classes.
+- `--from` accepts a zip, a single file, or a directory.
+- Sources can carry a notice (e.g. "unofficial scrape") shown with their data; `gurd
+  database` says when a database must not be shared.
+- JSON: `notice` on source records, `label` on attributes, a `gurd remove` document.
+
+### Changed
+
+- Database schema 2. Databases built by 0.2.0 are rebuilt by the next `gurd update`;
+  their sources other than the one being updated must be reinstalled, because 0.2.0 did
+  not store release files.
+- Substring matching is skipped when there is an exact match, and prefix matching uses the
+  index again; lookups on large databases take 5–50 ms.
+
 ## [0.2.0] - 2026-10-03
 
 ### Changed

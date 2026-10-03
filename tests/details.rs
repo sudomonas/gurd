@@ -114,12 +114,16 @@ fn exact_match_prints_card() {
     assert_eq!(out.status.code(), Some(0));
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(text.starts_with("Augmentin\n"), "{text}");
-    assert!(text.contains("  ID        rxcui:151392"));
+    assert!(text.contains("  ID       rxcui:151392"), "{text}");
     assert!(
-        text.contains("Ingredients (2)\n  amoxicillin\n  clavulanate\n"),
+        text.contains("Ingredients (2)\n    amoxicillin\n    clavulanate\n"),
         "{text}"
     );
-    assert!(text.contains("RxNorm Current Prescribable Content 2026-09-08"));
+    assert!(
+        text.contains("RxNorm Current Prescribable Content\n"),
+        "{text}"
+    );
+    assert!(text.contains("  Release  2026-09-08"), "{text}");
 }
 
 #[test]

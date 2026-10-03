@@ -27,6 +27,8 @@ pub struct SourceRecord {
     /// True when the release is older than `stale_after_days`: it may not reflect the
     /// provider's latest data.
     pub stale: bool,
+    /// Caveat to show with this source's data, e.g. that it is an unofficial scrape.
+    pub notice: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -165,6 +167,7 @@ pub enum Section {
     Ingredients,
     PreciseIngredients,
     Brands,
+    Products,
     ClinicalDrugs,
     BrandedDrugs,
     Combinations,
@@ -174,10 +177,11 @@ pub enum Section {
 }
 
 impl Section {
-    pub const ALL: [Section; 9] = [
+    pub const ALL: [Section; 10] = [
         Section::Ingredients,
         Section::PreciseIngredients,
         Section::Brands,
+        Section::Products,
         Section::ClinicalDrugs,
         Section::BrandedDrugs,
         Section::Combinations,
@@ -191,6 +195,7 @@ impl Section {
             Section::Ingredients => "ingredients",
             Section::PreciseIngredients => "precise_ingredients",
             Section::Brands => "brands",
+            Section::Products => "products",
             Section::ClinicalDrugs => "clinical_drugs",
             Section::BrandedDrugs => "branded_drugs",
             Section::Combinations => "combinations",
@@ -205,6 +210,7 @@ impl Section {
             Section::Ingredients => "Ingredients",
             Section::PreciseIngredients => "Precise ingredients",
             Section::Brands => "Brands",
+            Section::Products => "Products",
             Section::ClinicalDrugs => "Clinical drugs",
             Section::BrandedDrugs => "Branded drugs",
             Section::Combinations => "Combinations",

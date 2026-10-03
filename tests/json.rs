@@ -27,6 +27,7 @@ const SOURCE_RECORD: &[&str] = &[
     "imported_at",
     "importer_version",
     "license",
+    "notice",
     "origin",
     "provider",
     "redistributable",
@@ -145,7 +146,7 @@ fn details_document() {
             ("concepts[].sections.*[]", CONCEPT),
             ("concepts[].names[]", &["name", "name_type", "source_type"]),
             ("concepts[].identifiers[]", &["system", "value"]),
-            ("concepts[].attributes[]", &["key", "value"]),
+            ("concepts[].attributes[]", &["key", "label", "value"]),
             ("concepts[].relationships[]", &["predicate", "concept"]),
             ("concepts[].relationships[].concept", CONCEPT),
         ],
@@ -250,4 +251,28 @@ fn update_document() {
         )],
     );
     assert_eq!(paths(&v), expected);
+}
+
+#[test]
+fn remove_document() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("gurd.db");
+    let zip = common::fixture_zip(dir.path(), "RxNorm_full_prescribe_09082026.zip");
+    let status = Command::new(env!("CARGO_BIN_EXE_gurd"))
+        .args(["update", "--from", zip.to_str().unwrap()])
+        .env("GURD_DB", &db)
+        .output()
+        .unwrap()
+        .status;
+    assert!(status.success());
+    let out = Command::new(env!("CARGO_BIN_EXE_gurd"))
+        .args(["--json", "remove", "rxnorm"])
+        .env("GURD_DB", &db)
+        .output()
+        .unwrap();
+    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        paths(&v),
+        expect(&["json_version", "database", "removed", "sources"], &[])
+    );
 }
