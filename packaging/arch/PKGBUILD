@@ -1,0 +1,42 @@
+# Draft PKGBUILD for drug. Not yet on the AUR.
+# Before publishing: replace SKIP with the tarball's sha256sum (updpkgsums).
+pkgname=drug
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Local-first terminal drug lookup'
+arch=('x86_64' 'aarch64')
+url='https://github.com/sudomonas/gurd'
+license=('MIT')
+depends=('gcc-libs' 'glibc')
+makedepends=('cargo')
+options=('!lto')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "gurd-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "gurd-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release
+}
+
+check() {
+  cd "gurd-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --frozen
+}
+
+package() {
+  cd "gurd-$pkgver"
+  install -Dm755 target/release/drug "$pkgdir/usr/bin/drug"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 DATA-LICENSES.md "$pkgdir/usr/share/doc/$pkgname/DATA-LICENSES.md"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -Dm644 docs/json.md "$pkgdir/usr/share/doc/$pkgname/json.md"
+}
