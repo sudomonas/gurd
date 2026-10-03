@@ -37,15 +37,15 @@ pub fn make_zip(path: &Path, members: &[(&str, &[u8])]) {
     zip.finish().unwrap();
 }
 
-/// Builds an installed database from the fixture at `dir/drug.db`.
+/// Builds an installed database from the fixture at `dir/gurd.db`.
 pub fn fixture_db(dir: &Path) -> PathBuf {
     let zip = fixture_zip(dir, "RxNorm_full_prescribe_09082026.zip");
-    let db = dir.join("drug.db");
-    let input = drug::sources::Input::open(&zip).unwrap();
-    drug::import::install(
+    let db = dir.join("gurd.db");
+    let input = gurd::sources::Input::open(&zip).unwrap();
+    gurd::import::install(
         &db,
-        &[drug::import::Job {
-            source: &drug::sources::rxnorm::RxNorm,
+        &[gurd::import::Job {
+            source: &gurd::sources::rxnorm::RxNorm,
             input: &input,
             upstream_checksum: None,
         }],

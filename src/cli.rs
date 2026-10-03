@@ -4,18 +4,18 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 
 const AFTER_HELP: &str = "\
 Examples:
-  drug metformin
-  drug \"amoxicillin clavulanate\"
-  drug metformin --json
-  drug rxcui 6809
-  drug database
+  gurd metformin
+  gurd \"amoxicillin clavulanate\"
+  gurd metformin --json
+  gurd rxcui 6809
+  gurd database
 
 Exit status: 0 success, 1 not found or error, 2 invalid usage.
-Lookups never use the network; only `drug update` does.";
+Lookups never use the network; only `gurd update` does.";
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "drug",
+    name = "gurd",
     version,
     about = "Local-first drug lookup",
     after_help = AFTER_HELP,
@@ -34,8 +34,8 @@ pub struct Cli {
 
 #[derive(Debug, Args)]
 pub struct GlobalArgs {
-    /// Database file [default: $XDG_DATA_HOME/drug/drug.db]
-    #[arg(long, global = true, env = "DRUG_DB", value_name = "PATH")]
+    /// Database file [default: $XDG_DATA_HOME/gurd/gurd.db]
+    #[arg(long, global = true, env = "GURD_DB", value_name = "PATH")]
     pub db: Option<PathBuf>,
 
     /// Print JSON instead of text

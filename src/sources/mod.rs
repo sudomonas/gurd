@@ -33,7 +33,7 @@ pub struct SourceInfo {
     pub redistributable: bool,
     /// Age in days after which an installed release is reported as outdated.
     pub stale_after_days: Option<u32>,
-    /// Where `drug update` downloads the release from by default, if anywhere.
+    /// Where `gurd update` downloads the release from by default, if anywhere.
     pub download_url: Option<String>,
     /// Where the provider publishes checksums, for the user to compare against.
     pub checksums_url: Option<String>,
@@ -62,7 +62,7 @@ pub trait Source {
     }
 }
 
-/// Network access for `drug update`. Implemented by `net::Http` in builds with the
+/// Network access for `gurd update`. Implemented by `net::Http` in builds with the
 /// `net` feature, and by fakes in tests. Adapters never see it.
 pub trait Fetch {
     /// GETs `url` into `dest`, reporting (bytes so far, total if known).

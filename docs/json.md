@@ -5,7 +5,7 @@ else is written to stdout. In JSON mode, lookups print nothing to stderr either,
 script only needs to check the exit status and parse stdout.
 
 ```sh
-drug metformin --json | jq -r '.results[0].code'
+gurd metformin --json | jq -r '.results[0].code'
 ```
 
 ## Stability
@@ -52,7 +52,7 @@ so on.
 `clinical_dose_form_group`, `clinical_dose_form_group_precise`,
 `branded_dose_form_group`, `dose_form` or `dose_form_group`.
 
-`code_system:code` (e.g. `rxcui:6809`) is accepted by `drug show` and `drug id`.
+`code_system:code` (e.g. `rxcui:6809`) is accepted by `gurd show` and `gurd id`.
 
 ### Source versions
 
@@ -62,7 +62,7 @@ Lookup documents list the installed sources so the reader knows what was queried
 "sources": [{ "source": "rxnorm", "version": "2026-09-08" }]
 ```
 
-## `drug <query>` / `drug search <query>`
+## `gurd <query>` / `gurd search <query>`
 
 ```json
 {
@@ -95,7 +95,7 @@ Each result is a concept plus:
 Results are ordered by match strength, then kind, then name length. `--limit N` (default
 20; 0 means no limit) caps the number of results.
 
-## `drug show <query>`, `drug <query> --details`, `drug rxcui <RXCUI>`, `drug id <SYSTEM:VALUE>`
+## `gurd show <query>`, `gurd <query> --details`, `gurd rxcui <RXCUI>`, `gurd id <SYSTEM:VALUE>`
 
 ```json
 {
@@ -136,7 +136,7 @@ identifier, which can come from more than one source.
 | `attributes` | Source attributes, keys verbatim (RxNorm `ATN`, e.g. `RXN_STRENGTH`) |
 | `relationships` | Direct relationships as the source records them: "*this concept* `predicate` *concept*". Predicates are verbatim (RxNorm `RELA`) |
 
-## `drug class <query>`
+## `gurd class <query>`
 
 ```json
 {
@@ -153,17 +153,17 @@ identifier, which can come from more than one source.
 `concept` is the best match, or `null` if nothing matched. `classes` is empty unless an
 installed source provides drug classes. RxNorm Current Prescribable Content does not.
 
-## `drug database`
+## `gurd database`
 
 ```json
 {
   "json_version": 1,
   "database": {
-    "path": "/home/user/.local/share/drug/drug.db",
+    "path": "/home/user/.local/share/gurd/gurd.db",
     "installed": true,
     "schema_version": 1,
     "built_at": "2026-10-03T12:44:02Z",
-    "built_by": "drug 0.1.0",
+    "built_by": "gurd 0.1.0",
     "sources": [ { "...source record...": "" } ]
   }
 }
@@ -182,12 +182,12 @@ and the exit status is 1.
 | `code_system` | Identifier system of the source's concept codes |
 | `license`, `attribution`, `url` | Terms, required attribution text, official page |
 | `file_name`, `sha256`, `upstream_checksum` | Input file, its SHA-256, and the provider's published checksum if one was checked |
-| `retrieved_at`, `imported_at`, `importer_version` | When the file was obtained and imported, and by which version of drug |
-| `origin` | `builtin` (an adapter in drug) or `bundle` (a user-supplied dataset) |
+| `retrieved_at`, `imported_at`, `importer_version` | When the file was obtained and imported, and by which version of gurd |
+| `origin` | `builtin` (an adapter in gurd) or `bundle` (a user-supplied dataset) |
 | `redistributable` | Whether the dataset's terms allow sharing a database built from it |
 | `age_days`, `stale_after_days`, `stale` | Days since the release, the age at which it counts as outdated, and whether it is |
 
-## `drug sources`
+## `gurd sources`
 
 ```json
 {
@@ -204,16 +204,16 @@ and the exit status is 1.
 }
 ```
 
-`download_url` is where `drug update` downloads from by default, and `checksums_url` is
+`download_url` is where `gurd update` downloads from by default, and `checksums_url` is
 where the provider publishes checksums for you to check against. Either may be `null`.
 `installed` is `null` for sources that are not in the database.
 
-## `drug update`
+## `gurd update`
 
 ```json
 {
   "json_version": 1,
-  "database": "/home/user/.local/share/drug/drug.db",
+  "database": "/home/user/.local/share/gurd/gurd.db",
   "imported": [
     { "source": "rxnorm", "version": "2026-09-08", "concepts": 81468, "names": 140841,
       "identifiers": 327760, "relationships": 552956, "attributes": 230799 }

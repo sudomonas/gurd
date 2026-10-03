@@ -1,4 +1,4 @@
-//! `drug update` against a fake network: every failure leaves the installed database
+//! `gurd update` against a fake network: every failure leaves the installed database
 //! exactly as it was, and checksums are only what the user supplies.
 
 mod common;
@@ -8,10 +8,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
-use drug::database::Database;
-use drug::sources::rxnorm::{CURRENT_URL, RxNorm};
-use drug::sources::{Fetch, md5_file};
-use drug::update::{Options, Outcome, update};
+use gurd::database::Database;
+use gurd::sources::rxnorm::{CURRENT_URL, RxNorm};
+use gurd::sources::{Fetch, md5_file};
+use gurd::update::{Options, Outcome, update};
 
 /// Serves one file for any URL (or fails); records requested URLs.
 struct FakeNet {
@@ -67,7 +67,7 @@ fn setup(with_db: bool) -> Setup {
     let db = if with_db {
         common::fixture_db(dir.path())
     } else {
-        dir.path().join("drug.db")
+        dir.path().join("gurd.db")
     };
     Setup { dir, zip, db }
 }

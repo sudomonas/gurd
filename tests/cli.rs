@@ -1,10 +1,10 @@
 use std::path::Path;
 use std::process::{Command, Output};
 
-fn drug(db: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_drug"))
+fn gurd(db: &Path, args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_gurd"))
         .args(args)
-        .env("DRUG_DB", db)
+        .env("GURD_DB", db)
         .env_remove("NO_COLOR")
         .output()
         .unwrap()
@@ -17,28 +17,28 @@ fn code(out: &Output) -> i32 {
 #[test]
 fn version_and_help_succeed() {
     let dir = tempfile::tempdir().unwrap();
-    let db = dir.path().join("drug.db");
-    let out = drug(&db, &["--version"]);
+    let db = dir.path().join("gurd.db");
+    let out = gurd(&db, &["--version"]);
     assert_eq!(code(&out), 0);
-    assert!(String::from_utf8_lossy(&out.stdout).starts_with("drug "));
-    assert_eq!(code(&drug(&db, &["--help"])), 0);
+    assert!(String::from_utf8_lossy(&out.stdout).starts_with("gurd "));
+    assert_eq!(code(&gurd(&db, &["--help"])), 0);
 }
 
 #[test]
 fn usage_errors_exit_2() {
     let dir = tempfile::tempdir().unwrap();
-    let db = dir.path().join("drug.db");
-    assert_eq!(code(&drug(&db, &[])), 2);
-    assert_eq!(code(&drug(&db, &["--no-such-flag"])), 2);
-    assert_eq!(code(&drug(&db, &["show"])), 2);
-    assert_eq!(code(&drug(&db, &["--color", "sometimes", "database"])), 2);
+    let db = dir.path().join("gurd.db");
+    assert_eq!(code(&gurd(&db, &[])), 2);
+    assert_eq!(code(&gurd(&db, &["--no-such-flag"])), 2);
+    assert_eq!(code(&gurd(&db, &["show"])), 2);
+    assert_eq!(code(&gurd(&db, &["--color", "sometimes", "database"])), 2);
 }
 
 #[test]
 fn database_not_installed_exits_1() {
     let dir = tempfile::tempdir().unwrap();
-    let db = dir.path().join("drug.db");
-    let out = drug(&db, &["database"]);
+    let db = dir.path().join("gurd.db");
+    let out = gurd(&db, &["database"]);
     assert_eq!(code(&out), 1);
     let stdout = String::from_utf8(out.stdout).unwrap();
     assert!(stdout.contains("not installed"));
@@ -48,9 +48,9 @@ fn database_not_installed_exits_1() {
 #[test]
 fn database_installed_exits_0() {
     let dir = tempfile::tempdir().unwrap();
-    let db = dir.path().join("drug.db");
-    drop(drug::database::create(&db).unwrap());
-    let out = drug(&db, &["database"]);
+    let db = dir.path().join("gurd.db");
+    drop(gurd::database::create(&db).unwrap());
+    let out = gurd(&db, &["database"]);
     assert_eq!(code(&out), 0, "{}", String::from_utf8_lossy(&out.stderr));
     assert!(
         String::from_utf8(out.stdout)
@@ -63,11 +63,11 @@ fn database_installed_exits_0() {
 #[test]
 fn database_json_is_valid_and_quiet() {
     let dir = tempfile::tempdir().unwrap();
-    let db = dir.path().join("drug.db");
-    drop(drug::database::create(&db).unwrap());
+    let db = dir.path().join("gurd.db");
+    drop(gurd::database::create(&db).unwrap());
     // The global flag may come before or after the subcommand.
     for args in [["--json", "database"], ["database", "--json"]] {
-        let out = drug(&db, &args);
+        let out = gurd(&db, &args);
         assert_eq!(code(&out), 0);
         assert!(out.stderr.is_empty());
         let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
@@ -82,8 +82,8 @@ fn database_json_is_valid_and_quiet() {
 fn explicit_db_flag_overrides_env() {
     let dir = tempfile::tempdir().unwrap();
     let real = dir.path().join("real.db");
-    drop(drug::database::create(&real).unwrap());
-    let out = drug(
+    drop(gurd::database::create(&real).unwrap());
+    let out = gurd(
         &dir.path().join("absent.db"),
         &["--db", real.to_str().unwrap(), "database"],
     );
@@ -93,12 +93,12 @@ fn explicit_db_flag_overrides_env() {
 #[test]
 fn corrupt_database_is_an_error_on_stderr() {
     let dir = tempfile::tempdir().unwrap();
-    let db = dir.path().join("drug.db");
+    let db = dir.path().join("gurd.db");
     std::fs::write(&db, b"definitely not a sqlite database file").unwrap();
-    let out = drug(&db, &["database"]);
+    let out = gurd(&db, &["database"]);
     assert_eq!(code(&out), 1);
     assert!(out.stdout.is_empty());
-    assert!(String::from_utf8_lossy(&out.stderr).starts_with("drug: "));
+    assert!(String::from_utf8_lossy(&out.stderr).starts_with("gurd: "));
 }
 
 mod common;
@@ -113,7 +113,7 @@ fn fixture() -> (tempfile::TempDir, std::path::PathBuf) {
 fn search_prints_results_and_exits_0() {
     let (_d, db) = fixture();
     // A partial name lists matches, one per line.
-    let out = drug(&db, &["metfor"]);
+    let out = gurd(&db, &["metfor"]);
     assert_eq!(code(&out), 0);
     let stdout = String::from_utf8(out.stdout).unwrap();
     let first = stdout.lines().next().unwrap();
@@ -122,7 +122,7 @@ fn search_prints_results_and_exits_0() {
     assert!(!stdout.contains('\x1b'), "no color when piped");
 
     // An exact name gets the summary card.
-    let out = drug(&db, &["metformin"]);
+    let out = gurd(&db, &["metformin"]);
     assert_eq!(code(&out), 0);
     let stdout = String::from_utf8(out.stdout).unwrap();
     assert!(stdout.starts_with("metformin\n"), "{stdout}");
@@ -133,12 +133,12 @@ fn search_prints_results_and_exits_0() {
 #[test]
 fn search_words_need_no_quotes() {
     let (_d, db) = fixture();
-    let a = drug(&db, &["amoxicillin", "clavulanate"]);
-    let b = drug(&db, &["amoxicillin clavulanate"]);
+    let a = gurd(&db, &["amoxicillin", "clavulanate"]);
+    let b = gurd(&db, &["amoxicillin clavulanate"]);
     assert_eq!(code(&a), 0);
     assert_eq!(a.stdout, b.stdout);
     assert_eq!(
-        drug(&db, &["search", "amoxicillin", "clavulanate"]).stdout,
+        gurd(&db, &["search", "amoxicillin", "clavulanate"]).stdout,
         a.stdout
     );
 }
@@ -146,7 +146,7 @@ fn search_words_need_no_quotes() {
 #[test]
 fn search_without_match_exits_1() {
     let (_d, db) = fixture();
-    let out = drug(&db, &["zzqqxx"]);
+    let out = gurd(&db, &["zzqqxx"]);
     assert_eq!(code(&out), 1);
     assert!(out.stdout.is_empty());
     assert!(String::from_utf8_lossy(&out.stderr).contains("no match"));
@@ -155,7 +155,7 @@ fn search_without_match_exits_1() {
 #[test]
 fn search_json() {
     let (_d, db) = fixture();
-    let out = drug(&db, &["metformin", "--json"]);
+    let out = gurd(&db, &["metformin", "--json"]);
     assert_eq!(code(&out), 0);
     assert!(
         out.stderr.is_empty(),
@@ -180,7 +180,7 @@ fn search_json() {
 #[test]
 fn search_json_without_match_is_valid_and_exits_1() {
     let (_d, db) = fixture();
-    let out = drug(&db, &["--json", "zzqqxx"]);
+    let out = gurd(&db, &["--json", "zzqqxx"]);
     assert_eq!(code(&out), 1);
     assert!(out.stderr.is_empty());
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
@@ -190,17 +190,17 @@ fn search_json_without_match_is_valid_and_exits_1() {
 #[test]
 fn search_without_database_exits_1() {
     let dir = tempfile::tempdir().unwrap();
-    let out = drug(&dir.path().join("none.db"), &["metformin"]);
+    let out = gurd(&dir.path().join("none.db"), &["metformin"]);
     assert_eq!(code(&out), 1);
-    assert!(String::from_utf8_lossy(&out.stderr).contains("drug update"));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("gurd update"));
 }
 
 #[test]
 fn color_only_when_forced() {
     let (_d, db) = fixture();
-    let out = drug(&db, &["--color", "always", "metformin"]);
+    let out = gurd(&db, &["--color", "always", "metformin"]);
     assert!(String::from_utf8_lossy(&out.stdout).contains('\x1b'));
-    let out = drug(&db, &["--color", "always", "--no-color", "metformin"]);
+    let out = gurd(&db, &["--color", "always", "--no-color", "metformin"]);
     assert!(!String::from_utf8_lossy(&out.stdout).contains('\x1b'));
 }
 
@@ -217,7 +217,7 @@ fn stale_release_is_disclosed() {
         &["sources"],
         &["show", "metformin"],
     ] {
-        let out = drug(&db, args);
+        let out = gurd(&db, args);
         let text = String::from_utf8(out.stdout).unwrap();
         assert!(
             text.contains("may not reflect the provider's latest data"),
@@ -229,7 +229,7 @@ fn stale_release_is_disclosed() {
 #[test]
 fn sources_lists_builtin_sources_even_without_database() {
     let dir = tempfile::tempdir().unwrap();
-    let out = drug(&dir.path().join("none.db"), &["sources"]);
+    let out = gurd(&dir.path().join("none.db"), &["sources"]);
     assert_eq!(code(&out), 0);
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(
@@ -242,7 +242,7 @@ fn sources_lists_builtin_sources_even_without_database() {
 #[test]
 fn class_without_class_source_exits_1() {
     let (_d, db) = fixture();
-    let out = drug(&db, &["class", "metformin"]);
+    let out = gurd(&db, &["class", "metformin"]);
     assert_eq!(code(&out), 1);
     assert!(out.stdout.is_empty());
     assert!(

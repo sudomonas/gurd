@@ -10,7 +10,7 @@ use crate::output::Style;
 use crate::search::Hit;
 use crate::sources::SourceInfo;
 
-/// `rxcui:6809`, the same form `drug id` accepts.
+/// `rxcui:6809`, the same form `gurd id` accepts.
 pub fn concept_id(c: &ConceptRef) -> String {
     format!("{}:{}", c.code_system, c.code)
 }
@@ -41,7 +41,7 @@ pub fn hits(hits: &[Hit], style: Style) -> String {
     s
 }
 
-/// Items shown per section on the summary card; `drug show` lists everything.
+/// Items shown per section on the summary card; `gurd show` lists everything.
 pub const CARD_ITEMS: usize = 10;
 
 fn heading(s: &mut String, style: Style, concept: &ConceptRef, source: Option<&SourceRecord>) {
@@ -103,7 +103,7 @@ pub fn card(
 ) -> String {
     let mut s = String::new();
     heading(&mut s, style, concept, source);
-    let more = format!("drug show {}", concept_id(concept));
+    let more = format!("gurd show {}", concept_id(concept));
     for (section, items) in sections {
         section_list(&mut s, style, section.label(), items, CARD_ITEMS, &more);
     }
@@ -243,7 +243,7 @@ pub fn release_note(src: &SourceRecord, style: Style) -> String {
             "{} {}",
             src.version,
             style.bold(&format!(
-                "({age} days old; may not reflect the provider's latest data; run `drug update`)"
+                "({age} days old; may not reflect the provider's latest data; run `gurd update`)"
             ))
         ),
         (Some(age), false) => format!(
@@ -260,7 +260,7 @@ pub fn database(info: &DatabaseInfo, available: &[SourceInfo], style: Style) -> 
     let _ = writeln!(s, "{}", style.bold("Database"));
     let _ = writeln!(s, "  Path      {}", info.path);
     if !info.installed {
-        let _ = writeln!(s, "  Status    not installed (run `drug update`)");
+        let _ = writeln!(s, "  Status    not installed (run `gurd update`)");
         return s;
     }
     if let Some(v) = info.schema_version {
@@ -316,7 +316,7 @@ pub fn sources(available: &[SourceInfo], installed: &[SourceRecord], style: Styl
                 let _ = writeln!(s, "  Installed  {}", release_note(i, style));
             }
             None => {
-                let _ = writeln!(s, "  Installed  no (run `drug update --source {slug}`)");
+                let _ = writeln!(s, "  Installed  no (run `gurd update --source {slug}`)");
             }
         }
         for (n, line) in wrap(license, 64).iter().enumerate() {

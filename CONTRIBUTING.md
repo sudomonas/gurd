@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping. `drug` aims to stay a small Unix-style lookup tool, so please read
+Thanks for helping. `gurd` aims to stay a small Unix-style lookup tool, so please read
 the ground rules before starting on something large; opening an issue first is welcome.
 
 ## Ground rules
@@ -9,7 +9,7 @@ the ground rules before starting on something large; opening an issue first is w
   dataset. Don't add hand-written aliases, doses, interactions or other data to the code;
   missing data is shown as missing. Generated (e.g. LLM-written) drug content will not be
   accepted.
-- **No network during lookups.** Only `drug update` may use the network, and only
+- **No network during lookups.** Only `gurd update` may use the network, and only
   through `src/net.rs`. `tests/architecture.rs` enforces this.
 - **Keep dataset formats in their adapters.** File formats and vocabulary (RRF files, TTY
   codes, RELA labels, ...) belong in `src/sources/<source>.rs` only. The CLI, search and
@@ -38,9 +38,9 @@ To try changes against real data, build a database from an RxNorm release into a
 scratch file rather than your installed one:
 
 ```sh
-cargo run --release -- --db /tmp/drug.db update --from RxNorm_full_prescribe_MMDDYYYY.zip
-cargo run --release -- --db /tmp/drug.db metformin
-scripts/bench.sh /tmp/drug.db
+cargo run --release -- --db /tmp/gurd.db update --from RxNorm_full_prescribe_MMDDYYYY.zip
+cargo run --release -- --db /tmp/gurd.db metformin
+scripts/bench.sh /tmp/gurd.db
 ```
 
 ## Changing output

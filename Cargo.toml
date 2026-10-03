@@ -1,6 +1,6 @@
 [package]
-name = "drug"
-version = "0.1.0"
+name = "gurd"
+version = "0.2.0"
 edition = "2024"
 description = "Local-first terminal drug lookup"
 license = "MIT"
@@ -35,5 +35,5 @@ strip = true
 
 [features]
 default = ["net"]
-# HTTP for `drug update`. Without it the binary contains no network code at all.
+# HTTP for `gurd update`. Without it the binary contains no network code at all.
 net = ["dep:ureq"]

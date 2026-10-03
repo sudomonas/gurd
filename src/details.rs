@@ -138,7 +138,7 @@ pub fn sections(db: &Database, concept: &ConceptRef) -> Result<BTreeMap<Section,
     let mut sections: BTreeMap<Section, Vec<ConceptRef>> = BTreeMap::new();
     for (section, path, to_kind) in rules {
         let Some(section) = Section::parse(&section) else {
-            continue; // written by a newer version of drug
+            continue; // written by a newer version of gurd
         };
         let predicates: Vec<&str> = path.split(' ').collect();
         let items = follow(db, concept.id, &predicates, &to_kind)?;

@@ -47,7 +47,7 @@ fn only_update_command_reaches_network() {
             let uses: Vec<_> = text.match_indices("Http::new(").map(|(i, _)| i).collect();
             assert!(
                 uses.iter().all(|&i| i > start && i < end),
-                "Http::new used outside `drug update`"
+                "Http::new used outside `gurd update`"
             );
         }
     }

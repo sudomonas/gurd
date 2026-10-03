@@ -9,6 +9,17 @@ increment `json_version` and are marked **Breaking** here.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-03
+
+### Changed
+
+- **Breaking:** renamed the program from `drug` to `gurd`, to match the repository and
+  because the `drug` crate name is taken on crates.io. The binary, crate, environment
+  variable (`DRUG_DB` → `GURD_DB`), database file (`gurd.db`), data directory
+  (`~/.local/share/gurd`) and cache directory (`~/.cache/gurd`) all changed. A database
+  built by 0.1.0 can be moved to the new path, or rebuilt with `gurd update`. The JSON
+  format is unchanged.
+
 ## [0.1.0] - 2026-10-03
 
 ### Added
@@ -28,5 +39,6 @@ increment `json_version` and are marked **Breaking** here.
 - `--json` output for every command, `json_version` 1.
 - `net` cargo feature (on by default); without it the binary contains no network code.
 
-[Unreleased]: https://github.com/sudomonas/gurd/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sudomonas/gurd/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/sudomonas/gurd/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sudomonas/gurd/releases/tag/v0.1.0

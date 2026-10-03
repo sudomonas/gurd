@@ -1,4 +1,4 @@
--- drug database schema, version 1.
+-- gurd database schema, version 1.
 --
 -- Design rules:
 --   * Every source-derived row carries a source_id. Nothing is stored without provenance.

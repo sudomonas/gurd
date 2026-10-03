@@ -43,10 +43,10 @@ const SOURCE_RECORD: &[&str] = &[
 ];
 
 fn json(db: &Path, args: &[&str]) -> Value {
-    let out = Command::new(env!("CARGO_BIN_EXE_drug"))
+    let out = Command::new(env!("CARGO_BIN_EXE_gurd"))
         .arg("--json")
         .args(args)
-        .env("DRUG_DB", db)
+        .env("GURD_DB", db)
         .output()
         .unwrap();
     assert!(
@@ -228,9 +228,9 @@ fn class_document() {
 fn update_document() {
     let dir = tempfile::tempdir().unwrap();
     let zip = common::fixture_zip(dir.path(), "RxNorm_full_prescribe_09082026.zip");
-    let out = Command::new(env!("CARGO_BIN_EXE_drug"))
+    let out = Command::new(env!("CARGO_BIN_EXE_gurd"))
         .args(["--json", "update", "--from", zip.to_str().unwrap()])
-        .env("DRUG_DB", dir.path().join("drug.db"))
+        .env("GURD_DB", dir.path().join("gurd.db"))
         .output()
         .unwrap();
     let v: Value = serde_json::from_slice(&out.stdout).unwrap();

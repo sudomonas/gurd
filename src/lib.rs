@@ -1,4 +1,4 @@
-//! `drug`: a local-first terminal drug lookup.
+//! `gurd`: a local-first terminal drug lookup.
 //!
 //! Layering: `cli` (argument parsing) → `app` (commands) → `database` (SQLite repository).
 //! Lookups never touch the network and open the database read-only.

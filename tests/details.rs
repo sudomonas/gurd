@@ -3,25 +3,25 @@ mod common;
 use std::path::Path;
 use std::process::{Command, Output};
 
-use drug::database::Database;
-use drug::details;
-use drug::models::Section;
-use drug::search::search;
+use gurd::database::Database;
+use gurd::details;
+use gurd::models::Section;
+use gurd::search::search;
 
-fn names(items: &[drug::models::ConceptRef]) -> Vec<&str> {
+fn names(items: &[gurd::models::ConceptRef]) -> Vec<&str> {
     items.iter().map(|c| c.name.as_str()).collect()
 }
 
-fn concept(db: &Database, rxcui: &str) -> drug::models::ConceptRef {
+fn concept(db: &Database, rxcui: &str) -> gurd::models::ConceptRef {
     details::by_identifier(db, "rxcui", rxcui)
         .unwrap()
         .remove(0)
 }
 
 fn run(db: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_drug"))
+    Command::new(env!("CARGO_BIN_EXE_gurd"))
         .args(args)
-        .env("DRUG_DB", db)
+        .env("GURD_DB", db)
         .env("PAGER", "false") // would swallow output if (wrongly) used when piped
         .output()
         .unwrap()

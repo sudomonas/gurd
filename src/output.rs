@@ -8,7 +8,7 @@ use crate::cli::ColorChoice;
 /// Version of the JSON output format, included in every JSON document.
 pub const JSON_VERSION: u32 = 1;
 
-/// Writes to stdout. A closed pipe (`drug x | head`) is not an error.
+/// Writes to stdout. A closed pipe (`gurd x | head`) is not an error.
 pub fn emit(text: &str) -> Result<()> {
     let mut out = io::stdout().lock();
     match out.write_all(text.as_bytes()).and_then(|()| out.flush()) {

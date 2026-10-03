@@ -1,8 +1,8 @@
 mod common;
 
-use drug::database::Database;
-use drug::sources::rxnorm::{ATTRIBUTION, RxNorm};
-use drug::sources::{Input, Source};
+use gurd::database::Database;
+use gurd::sources::rxnorm::{ATTRIBUTION, RxNorm};
+use gurd::sources::{Input, Source};
 use rusqlite::Connection;
 
 fn fixture() -> (tempfile::TempDir, Connection) {
@@ -207,9 +207,9 @@ fn rejects_malformed_rows() {
         ],
     );
     let input = Input::open(&zip).unwrap();
-    let err = drug::import::build(
+    let err = gurd::import::build(
         &dir.path().join("out.db"),
-        &[drug::import::Job {
+        &[gurd::import::Job {
             source: &RxNorm,
             input: &input,
             upstream_checksum: None,

@@ -7,9 +7,9 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Result, bail};
-use drug::import::{self, ImportSink, Job};
-use drug::models::{Kind, NameType};
-use drug::sources::{Input, Release, Source, SourceInfo};
+use gurd::import::{self, ImportSink, Job};
+use gurd::models::{Kind, NameType};
+use gurd::sources::{Input, Release, Source, SourceInfo};
 use rusqlite::Connection;
 
 #[derive(Clone, Copy)]
@@ -99,12 +99,12 @@ fn successful_update_replaces_database_and_keeps_backup() {
 
     install(&db, dir.path(), Behaviour::Good).unwrap();
 
-    let sources = drug::database::Database::open(&db)
+    let sources = gurd::database::Database::open(&db)
         .unwrap()
         .sources()
         .unwrap();
     assert_eq!(sources[0].slug, "fake");
-    assert_eq!(fs::read(dir.path().join("drug.db.bak")).unwrap(), before);
+    assert_eq!(fs::read(dir.path().join("gurd.db.bak")).unwrap(), before);
     assert_no_leftovers(dir.path());
 }
 
@@ -122,16 +122,16 @@ fn failures_leave_installed_database_untouched() {
         assert!(install(&db, dir.path(), behaviour).is_err());
 
         assert_eq!(fs::read(&db).unwrap(), before);
-        assert!(!dir.path().join("drug.db.bak").exists());
+        assert!(!dir.path().join("gurd.db.bak").exists());
         assert_no_leftovers(dir.path());
-        drug::database::Database::open(&db).unwrap();
+        gurd::database::Database::open(&db).unwrap();
     }
 }
 
 #[test]
 fn failed_first_install_leaves_nothing() {
     let dir = tempfile::tempdir().unwrap();
-    let db = dir.path().join("drug.db");
+    let db = dir.path().join("gurd.db");
     assert!(install(&db, dir.path(), Behaviour::FailValidation).is_err());
     assert!(!db.exists());
     assert_no_leftovers(dir.path());
@@ -149,7 +149,7 @@ fn cli_update_with_bad_input_keeps_database() {
     common::make_zip(&wrong, &[("hello.txt", b"hi")]);
 
     for file in [&junk, &wrong, &dir.path().join("missing.zip")] {
-        let out = Command::new(env!("CARGO_BIN_EXE_drug"))
+        let out = Command::new(env!("CARGO_BIN_EXE_gurd"))
             .args([
                 "--db",
                 db.to_str().unwrap(),
@@ -175,8 +175,8 @@ fn cli_update_with_bad_input_keeps_database() {
 fn cli_update_installs_fixture() {
     let dir = tempfile::tempdir().unwrap();
     let zip = common::fixture_zip(dir.path(), "RxNorm_full_prescribe_09082026.zip");
-    let db = dir.path().join("sub/dir/drug.db");
-    let out = Command::new(env!("CARGO_BIN_EXE_drug"))
+    let db = dir.path().join("sub/dir/gurd.db");
+    let out = Command::new(env!("CARGO_BIN_EXE_gurd"))
         .args([
             "--db",
             db.to_str().unwrap(),
@@ -203,7 +203,7 @@ fn cli_update_installs_fixture() {
 #[test]
 fn unknown_source_is_an_error() {
     let dir = tempfile::tempdir().unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_drug"))
+    let out = Command::new(env!("CARGO_BIN_EXE_gurd"))
         .args([
             "--db",
             dir.path().join("x.db").to_str().unwrap(),
@@ -232,7 +232,7 @@ impl Source for BadNavigation {
         Fake(Behaviour::Good).import(input, sink)?;
         sink.navigation(
             Kind::Ingredient,
-            drug::models::Section::Brands,
+            gurd::models::Section::Brands,
             &["no_such_predicate"],
             Kind::BrandName,
         )
@@ -244,7 +244,7 @@ fn navigation_with_unknown_predicate_fails_validation() {
     let dir = tempfile::tempdir().unwrap();
     let input = input(dir.path());
     let err = import::install(
-        &dir.path().join("drug.db"),
+        &dir.path().join("gurd.db"),
         &[Job {
             source: &BadNavigation,
             input: &input,

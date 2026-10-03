@@ -1,4 +1,4 @@
-//! `drug update`: obtain a release file, optionally verify it, and install a database
+//! `gurd update`: obtain a release file, optionally verify it, and install a database
 //! built from it. The same steps apply to every source:
 //!
 //! 1. take the release file: a local file (`--from`), or a download from `--url` or the
@@ -65,8 +65,8 @@ pub fn update(
     };
     let Some(fetch) = fetch else {
         bail!(
-            "this build of drug has no network support; download {url} yourself \
-             and run `drug update --from FILE`"
+            "this build of gurd has no network support; download {url} yourself \
+             and run `gurd update --from FILE`"
         );
     };
 

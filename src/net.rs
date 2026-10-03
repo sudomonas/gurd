@@ -1,5 +1,5 @@
 //! The only module that uses the network. It exists only in builds with the `net`
-//! feature and is only reachable from `drug update`; lookups never get here.
+//! feature and is only reachable from `gurd update`; lookups never get here.
 
 use std::fs::File;
 use std::io::{self, Read, Write};
@@ -20,7 +20,7 @@ impl Http {
         let agent = ureq::Agent::config_builder()
             .timeout_connect(Some(Duration::from_secs(30)))
             .timeout_recv_response(Some(Duration::from_secs(60)))
-            .user_agent(concat!("drug/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("gurd/", env!("CARGO_PKG_VERSION")))
             .build()
             .new_agent();
         Self { agent }

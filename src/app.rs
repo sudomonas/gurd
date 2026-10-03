@@ -29,7 +29,7 @@ pub fn run(cli: Cli) -> Result<ExitCode> {
         Some(Command::Id { ref identifier }) => match details::parse_identifier(identifier) {
             Some((system, value)) => lookup_identifier(&cli, identifier, &system, value),
             None => {
-                eprintln!("drug: expected SYSTEM:VALUE, e.g. rxcui:6809 or unii:9100L32L2N");
+                eprintln!("gurd: expected SYSTEM:VALUE, e.g. rxcui:6809 or unii:9100L32L2N");
                 Ok(ExitCode::from(2))
             }
         },
@@ -98,7 +98,7 @@ fn find(cli: &Cli, args: &SearchArgs) -> Result<ExitCode> {
     }
 
     match hits.first() {
-        None => eprintln!("drug: no match for \"{query}\""),
+        None => eprintln!("gurd: no match for \"{query}\""),
         // An exact match gets the summary card; anything else gets the list.
         Some(top) if top.matched == Match::Exact => {
             let sections = details::sections(&db, &top.concept)?;
@@ -122,7 +122,7 @@ fn find(cli: &Cli, args: &SearchArgs) -> Result<ExitCode> {
             output::emit(&render::hits(&hits, style(cli)))?;
             if hits.len() == args.limit {
                 eprintln!(
-                    "drug: showing the first {} matches; use --limit to change",
+                    "gurd: showing the first {} matches; use --limit to change",
                     args.limit
                 );
             }
@@ -131,7 +131,7 @@ fn find(cli: &Cli, args: &SearchArgs) -> Result<ExitCode> {
     Ok(exit(!hits.is_empty()))
 }
 
-/// `drug show QUERY`: details of the best match, or of every concept with a given
+/// `gurd show QUERY`: details of the best match, or of every concept with a given
 /// identifier when QUERY looks like `system:value`.
 fn show(cli: &Cli, query: &str) -> Result<ExitCode> {
     if let Some((system, value)) = details::parse_identifier(query) {
@@ -141,10 +141,10 @@ fn show(cli: &Cli, query: &str) -> Result<ExitCode> {
     let hits = search::search(&db, query, 1)?;
     if let Some(hit) = hits.first() {
         if hit.matched == Match::Fuzzy && !cli.global.json {
-            eprintln!("drug: no match for \"{query}\"; showing the closest name");
+            eprintln!("gurd: no match for \"{query}\"; showing the closest name");
         }
     } else if !cli.global.json {
-        eprintln!("drug: no match for \"{query}\"");
+        eprintln!("gurd: no match for \"{query}\"");
     }
     let concepts = hits.into_iter().map(|h| h.concept).collect();
     print_details(cli, &db, query, concepts)
@@ -154,7 +154,7 @@ fn lookup_identifier(cli: &Cli, query: &str, system: &str, value: &str) -> Resul
     let db = open(cli)?;
     let concepts = details::by_identifier(&db, system, value)?;
     if concepts.is_empty() && !cli.global.json {
-        eprintln!("drug: nothing has the identifier {system}:{value}");
+        eprintln!("gurd: nothing has the identifier {system}:{value}");
     }
     print_details(cli, &db, query, concepts)
 }
@@ -271,7 +271,7 @@ fn update(cli: &Cli, args: &UpdateArgs) -> Result<ExitCode> {
         cache_dir: config::cache_dir()?,
     };
     if let Some(file) = &args.from {
-        eprintln!("drug: importing {} from {}", args.source, file.display());
+        eprintln!("gurd: importing {} from {}", args.source, file.display());
     }
     let tty = std::io::stderr().is_terminal();
     let mut log = |msg: &str| {
@@ -281,7 +281,7 @@ fn update(cli: &Cli, args: &UpdateArgs) -> Result<ExitCode> {
                 eprint!("{msg}");
             }
         } else {
-            eprintln!("drug: {msg}");
+            eprintln!("gurd: {msg}");
         }
     };
     let (imported, up_to_date) = match update::update(source.as_ref(), &options, fetch, &mut log)? {
@@ -361,7 +361,7 @@ fn available_sources() -> Vec<SourceInfo> {
     sources::builtin().iter().map(|s| s.info()).collect()
 }
 
-/// `drug sources`: every source this build can import, and what is installed.
+/// `gurd sources`: every source this build can import, and what is installed.
 fn list_sources(cli: &Cli) -> Result<ExitCode> {
     let installed = match open(cli) {
         Ok(db) => db.sources()?,
@@ -434,7 +434,7 @@ fn list_sources(cli: &Cli) -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-/// `drug class QUERY`: drug classes of the best match, from sources that provide them.
+/// `gurd class QUERY`: drug classes of the best match, from sources that provide them.
 fn class(cli: &Cli, query: &str) -> Result<ExitCode> {
     let db = open(cli)?;
     let sources = db.sources()?;
@@ -469,15 +469,15 @@ fn class(cli: &Cli, query: &str) -> Result<ExitCode> {
             classes: &classes,
         })?;
     } else if !details::has_classifications(&db)? {
-        eprintln!("drug: no installed source provides drug classes");
+        eprintln!("gurd: no installed source provides drug classes");
     } else if let Some(c) = &concept {
         if classes.is_empty() {
-            eprintln!("drug: no drug classes recorded for {}", c.name);
+            eprintln!("gurd: no drug classes recorded for {}", c.name);
         } else {
             output::emit(&render::classes(c, &classes, style(cli)))?;
         }
     } else {
-        eprintln!("drug: no match for \"{query}\"");
+        eprintln!("gurd: no match for \"{query}\"");
     }
     Ok(exit(!classes.is_empty()))
 }

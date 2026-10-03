@@ -1,7 +1,7 @@
 mod common;
 
-use drug::database::Database;
-use drug::search::{Hit, Match, search};
+use gurd::database::Database;
+use gurd::search::{Hit, Match, search};
 
 fn db() -> (tempfile::TempDir, Database) {
     let dir = tempfile::tempdir().unwrap();

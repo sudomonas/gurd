@@ -19,7 +19,7 @@ impl fmt::Display for NotInstalled {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "no database at {}; run `drug update` to install one",
+            "no database at {}; run `gurd update` to install one",
             self.0.display()
         )
     }
@@ -47,12 +47,12 @@ impl Database {
             .with_context(|| format!("{} is not a SQLite database", path.display()))?;
         match version {
             SCHEMA_VERSION => {}
-            0 => bail!("{} is not a drug database", path.display()),
+            0 => bail!("{} is not a gurd database", path.display()),
             v if v > SCHEMA_VERSION => bail!(
-                "database schema {v} is newer than this version of drug supports ({SCHEMA_VERSION}); upgrade drug"
+                "database schema {v} is newer than this version of gurd supports ({SCHEMA_VERSION}); upgrade gurd"
             ),
             v => bail!(
-                "database schema {v} is older than {SCHEMA_VERSION}; run `drug update` to rebuild it"
+                "database schema {v} is older than {SCHEMA_VERSION}; run `gurd update` to rebuild it"
             ),
         }
         Ok(Self {
@@ -136,7 +136,7 @@ pub fn create(path: &Path) -> Result<Connection> {
         "INSERT INTO meta (key, value) VALUES
            ('built_by', ?1),
            ('built_at', strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))",
-        [concat!("drug ", env!("CARGO_PKG_VERSION"))],
+        [concat!("gurd ", env!("CARGO_PKG_VERSION"))],
     )?;
     tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     tx.commit()?;

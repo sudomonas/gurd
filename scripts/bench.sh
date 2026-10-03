@@ -1,9 +1,9 @@
 #!/bin/sh
-# Times lookups against a real database: scripts/bench.sh path/to/drug.db [runs]
+# Times lookups against a real database: scripts/bench.sh path/to/gurd.db [runs]
 set -eu
 DB=$1
 RUNS=${2:-20}
-BIN=$(dirname "$0")/../target/release/drug
+BIN=$(dirname "$0")/../target/release/gurd
 [ -x "$BIN" ] || cargo build --release
 for q in metformin METFORMIN "metformin hydrochloride" augmentin "amoxicillin clavulanate" \
          metfor tformi metfromin acetaminophen a zzqqxx; do

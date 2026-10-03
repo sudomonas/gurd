@@ -1,4 +1,4 @@
-use drug::database::{self, Database, NotInstalled, SCHEMA_VERSION};
+use gurd::database::{self, Database, NotInstalled, SCHEMA_VERSION};
 use rusqlite::Connection;
 
 fn names_of(conn: &Connection, kind: &str) -> Vec<String> {
@@ -14,20 +14,20 @@ fn names_of(conn: &Connection, kind: &str) -> Vec<String> {
 #[test]
 fn create_then_open() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("drug.db");
+    let path = dir.path().join("gurd.db");
     drop(database::create(&path).unwrap());
 
     let db = Database::open(&path).unwrap();
     assert_eq!(db.path(), path);
     assert!(db.meta("built_at").unwrap().is_some());
-    assert!(db.meta("built_by").unwrap().unwrap().starts_with("drug "));
+    assert!(db.meta("built_by").unwrap().unwrap().starts_with("gurd "));
     assert!(db.sources().unwrap().is_empty());
 }
 
 #[test]
 fn required_tables_exist() {
     let dir = tempfile::tempdir().unwrap();
-    let conn = database::create(&dir.path().join("drug.db")).unwrap();
+    let conn = database::create(&dir.path().join("gurd.db")).unwrap();
     let tables = names_of(&conn, "table");
     for t in [
         "meta",
@@ -50,7 +50,7 @@ fn required_tables_exist() {
 #[test]
 fn required_indexes_exist() {
     let dir = tempfile::tempdir().unwrap();
-    let conn = database::create(&dir.path().join("drug.db")).unwrap();
+    let conn = database::create(&dir.path().join("gurd.db")).unwrap();
     let indexes = names_of(&conn, "index");
     for i in [
         "names_norm",
@@ -68,7 +68,7 @@ fn required_indexes_exist() {
 #[test]
 fn concept_kinds_are_seeded() {
     let dir = tempfile::tempdir().unwrap();
-    let conn = database::create(&dir.path().join("drug.db")).unwrap();
+    let conn = database::create(&dir.path().join("gurd.db")).unwrap();
     for kind in [
         "ingredient",
         "precise_ingredient",
@@ -92,7 +92,7 @@ fn concept_kinds_are_seeded() {
 #[test]
 fn source_metadata_round_trips() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("drug.db");
+    let path = dir.path().join("gurd.db");
     let conn = database::create(&path).unwrap();
     conn.execute(
         "INSERT INTO sources (slug, title, code_system, provider, version, release_date, license, attribution,
@@ -116,7 +116,7 @@ fn source_metadata_round_trips() {
 #[test]
 fn every_source_derived_table_requires_a_source() {
     let dir = tempfile::tempdir().unwrap();
-    let conn = database::create(&dir.path().join("drug.db")).unwrap();
+    let conn = database::create(&dir.path().join("gurd.db")).unwrap();
     for table in [
         "concepts",
         "names",
@@ -141,7 +141,7 @@ fn every_source_derived_table_requires_a_source() {
 #[test]
 fn fts_tokenizers_are_available() {
     let dir = tempfile::tempdir().unwrap();
-    let conn = database::create(&dir.path().join("drug.db")).unwrap();
+    let conn = database::create(&dir.path().join("gurd.db")).unwrap();
     conn.execute_batch(
         "INSERT INTO sources (id, slug, title, code_system, provider, version, license, attribution, url, file_name,
                               sha256, retrieved_at, imported_at, importer_version, origin, redistributable)
@@ -174,7 +174,7 @@ fn fts_tokenizers_are_available() {
 #[test]
 fn opened_database_is_read_only() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("drug.db");
+    let path = dir.path().join("gurd.db");
     drop(database::create(&path).unwrap());
     let db = Database::open(&path).unwrap();
     let err = db
@@ -194,7 +194,7 @@ fn missing_database_is_reported_as_not_installed() {
 #[test]
 fn create_refuses_to_overwrite() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("drug.db");
+    let path = dir.path().join("gurd.db");
     std::fs::write(&path, b"precious").unwrap();
     assert!(database::create(&path).is_err());
     assert_eq!(std::fs::read(&path).unwrap(), b"precious");
@@ -217,7 +217,7 @@ fn rejects_other_files_and_schema_versions() {
         Database::open(&plain)
             .unwrap_err()
             .to_string()
-            .contains("not a drug database")
+            .contains("not a gurd database")
     );
 
     let newer = dir.path().join("newer.db");
@@ -236,7 +236,7 @@ fn rejects_other_files_and_schema_versions() {
 #[test]
 fn kind_enum_matches_schema() {
     let dir = tempfile::tempdir().unwrap();
-    let conn = database::create(&dir.path().join("drug.db")).unwrap();
+    let conn = database::create(&dir.path().join("gurd.db")).unwrap();
     let mut stmt = conn
         .prepare("SELECT kind FROM concept_kinds ORDER BY kind")
         .unwrap();
@@ -245,22 +245,22 @@ fn kind_enum_matches_schema() {
         .unwrap()
         .map(Result::unwrap)
         .collect();
-    let mut in_code: Vec<String> = drug::models::Kind::ALL
+    let mut in_code: Vec<String> = gurd::models::Kind::ALL
         .iter()
         .map(|k| k.as_str().to_owned())
         .collect();
     in_db.sort();
     in_code.sort();
     assert_eq!(in_db, in_code);
-    for k in drug::models::Kind::ALL {
-        assert_eq!(drug::models::Kind::parse(k.as_str()), Some(k));
+    for k in gurd::models::Kind::ALL {
+        assert_eq!(gurd::models::Kind::parse(k.as_str()), Some(k));
     }
 }
 
 #[test]
 fn staleness_is_computed_from_release_date() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("drug.db");
+    let path = dir.path().join("gurd.db");
     let conn = database::create(&path).unwrap();
     conn.execute_batch(
         "INSERT INTO sources (slug, title, code_system, provider, version, release_date,
