@@ -22,7 +22,8 @@ fn sources() -> Vec<(String, String)> {
                     })
                     .collect::<Vec<_>>()
                     .join("/");
-                out.push((rel, fs::read_to_string(&path).unwrap()));
+                let content = fs::read_to_string(&path).unwrap().replace("\r\n", "\n");
+                out.push((rel, content));
             }
         }
     }
