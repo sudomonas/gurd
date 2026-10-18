@@ -1,6 +1,6 @@
 [package]
 name = "gurd"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "Local-first terminal drug lookup"
 license = "MIT"
@@ -37,3 +37,12 @@ strip = true
 default = ["net"]
 # HTTP for `gurd update`. Without it the binary contains no network code at all.
 net = ["dep:ureq"]
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.{ archive-format }"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tar.gz"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
+

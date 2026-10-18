@@ -121,12 +121,12 @@ fn search_prints_results_and_exits_0() {
     assert!(first.ends_with("metformin"), "{first}");
     assert!(!stdout.contains('\x1b'), "no color when piped");
 
-    // An exact name gets the summary card.
+    // An exact name gets the clinical manual page.
     let out = gurd(&db, &["metformin"]);
     assert_eq!(code(&out), 0);
     let stdout = String::from_utf8(out.stdout).unwrap();
-    assert!(stdout.starts_with("metformin\n"), "{stdout}");
-    assert!(stdout.contains("rxcui:6809"));
+    assert!(stdout.starts_with("METFORMIN(7)"), "{stdout}");
+    assert!(stdout.to_ascii_lowercase().contains("6809"));
     assert!(!stdout.contains('\x1b'), "no color when piped");
 }
 

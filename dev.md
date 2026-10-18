@@ -780,28 +780,29 @@ cargo test
 ### Release a new version
 
 1. Update `version` in `Cargo.toml`, move CHANGELOG entries from **Unreleased** to the
-   new version, and update the version in the README install commands and the PKGBUILD.
-2. Run all checks (section 13).
-3. Build and package:
+   new version, and update PKGBUILD.
+2. Run all checks: `cargo test` and `cargo clippy -- -D warnings`.
+3. Commit, tag and push:
 
    ```sh
-   cargo build --release --locked
-   V=0.2.1; N=gurd-$V-x86_64-linux-gnu
-   mkdir -p dist/$N && cp target/release/gurd README.md LICENSE DATA-LICENSES.md CHANGELOG.md docs/json.md dist/$N/
-   (cd dist && tar czf $N.tar.gz $N && sha256sum $N.tar.gz > $N.tar.gz.sha256)
+   V=0.2.1
+   git commit -am "Release $V"
+   git tag -a v$V -m "gurd $V"
+   git push origin main v$V
    ```
 
-4. Commit, tag and publish:
+4. The `.github/workflows/release.yml` GitHub Action automatically runs across Ubuntu,
+   macOS, and Windows runners to build, package, and publish release binaries for:
+   - `x86_64-unknown-linux-musl` (universal static Linux x86_64)
+   - `aarch64-unknown-linux-musl` (universal static Linux ARM64)
+   - `x86_64-unknown-linux-gnu` (Linux glibc x86_64)
+   - `aarch64-apple-darwin` (macOS Apple Silicon)
+   - `x86_64-apple-darwin` (macOS Intel)
+   - `x86_64-pc-windows-msvc` (Windows x86_64)
 
-   ```sh
-   git commit -am "Release $V" && git tag -a v$V -m "gurd $V" && git push origin main v$V
-   gh release create v$V --title "gurd $V" --notes-file notes.md dist/$N.tar.gz dist/$N.tar.gz.sha256
-   ```
-
-5. Download the asset from GitHub, verify the checksum, and run it once.
-
-The binary built on Arch needs glibc 2.39 or newer. A static musl build or a GitHub
-Actions build on an older distro would make it run on more systems.
+   Each build generates SHA-256 checksums and attaches assets to the GitHub Release.
+   Users on Linux/macOS can install via `install.sh`, on Windows via `install.ps1`, or
+   using `cargo binstall gurd`.
 
 ### Publish to the AUR
 

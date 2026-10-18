@@ -151,7 +151,7 @@ fn onemg_products_show_every_field() {
     let db = rxnorm_db(dir.path());
     install(&db, "1mg", &onemg_dir(dir.path()));
 
-    let text = stdout(&gurd(&db, &["glycofake 500 tablet"]));
+    let text = stdout(&gurd(&db, &["raw", "glycofake 500 tablet"]));
     for part in [
         "1mg medicines (third-party Kaggle scrape)",
         "Unofficial third-party scrape",
@@ -167,7 +167,7 @@ fn onemg_products_show_every_field() {
         assert!(text.contains(part), "missing {part:?} in:\n{text}");
     }
     // Composition parsing keeps parenthesized names whole.
-    let text = stdout(&gurd(&db, &["vitamin b6 (pyridoxine)"]));
+    let text = stdout(&gurd(&db, &["raw", "vitamin b6 (pyridoxine)"]));
     assert!(text.contains("Vitafake Injection"), "{text}");
 }
 
@@ -178,7 +178,7 @@ fn ingredient_page_combines_sources() {
     install(&db, "1mg", &onemg_dir(dir.path()));
     install(&db, "rxterms", &rxterms_zip(dir.path()));
 
-    let text = stdout(&gurd(&db, &["metformin"]));
+    let text = stdout(&gurd(&db, &["raw", "metformin"]));
     let rxnorm = text.find("RxNorm Current Prescribable Content").unwrap();
     let rxterms = text.find("\nRxTerms\n").expect(&text);
     let onemg = text.find("1mg medicines").expect(&text);
@@ -196,7 +196,7 @@ fn azindia_keeps_columns_and_classes() {
     let db = dir.path().join("gurd.db");
     install(&db, "az-india", &azindia_csv(dir.path()));
 
-    let text = stdout(&gurd(&db, &["fakeol 650 tablet"]));
+    let text = stdout(&gurd(&db, &["raw", "fakeol 650 tablet"]));
     for part in [
         "Otherol 650 Tablet",
         "Nausea, Rash, mild",
@@ -241,7 +241,7 @@ fn openfda_links_to_rxnorm_by_identifiers() {
     assert_eq!(v["concepts"][0]["source"], "openfda", "{v}");
 
     // A single-ingredient product's UNII links its ingredient to RxNorm's precise ingredient.
-    let text = stdout(&gurd(&db, &["metformin hydrochloride"]));
+    let text = stdout(&gurd(&db, &["raw", "metformin hydrochloride"]));
     assert!(text.contains("openFDA NDC Directory"), "{text}");
     assert!(text.contains("Do not rely on openFDA"), "{text}");
 

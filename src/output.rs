@@ -56,6 +56,42 @@ impl Style {
         self.wrap("2", s)
     }
 
+    pub fn underline(&self, s: &str) -> String {
+        self.wrap("4", s)
+    }
+
+    pub fn red(&self, s: &str) -> String {
+        self.wrap("31", s)
+    }
+
+    pub fn green(&self, s: &str) -> String {
+        self.wrap("32", s)
+    }
+
+    pub fn yellow(&self, s: &str) -> String {
+        self.wrap("33", s)
+    }
+
+    pub fn cyan(&self, s: &str) -> String {
+        self.wrap("36", s)
+    }
+
+    pub fn bold_red(&self, s: &str) -> String {
+        self.wrap("1;31", s)
+    }
+
+    pub fn bold_yellow(&self, s: &str) -> String {
+        self.wrap("1;33", s)
+    }
+
+    pub fn bold_cyan(&self, s: &str) -> String {
+        self.wrap("1;36", s)
+    }
+
+    pub fn bold_white(&self, s: &str) -> String {
+        self.wrap("1;37", s)
+    }
+
     fn wrap(&self, code: &str, s: &str) -> String {
         if self.color {
             format!("\x1b[{code}m{s}\x1b[0m")
@@ -74,14 +110,30 @@ pub fn page(text: &str, enabled: bool) -> Result<()> {
     let pager = std::env::var("PAGER").ok().filter(|p| !p.trim().is_empty());
     let mut command = match &pager {
         Some(p) => {
-            let mut c = std::process::Command::new("sh");
-            c.arg("-c").arg(p);
-            c
+            #[cfg(windows)]
+            {
+                let mut c = std::process::Command::new("cmd");
+                c.arg("/C").arg(p);
+                c
+            }
+            #[cfg(not(windows))]
+            {
+                let mut c = std::process::Command::new("sh");
+                c.arg("-c").arg(p);
+                c
+            }
         }
         None => {
-            let mut c = std::process::Command::new("less");
-            c.arg("-FRX");
-            c
+            #[cfg(windows)]
+            {
+                std::process::Command::new("more")
+            }
+            #[cfg(not(windows))]
+            {
+                let mut c = std::process::Command::new("less");
+                c.arg("-FRX");
+                c
+            }
         }
     };
     let Ok(mut child) = command.stdin(std::process::Stdio::piped()).spawn() else {
@@ -91,6 +143,6 @@ pub fn page(text: &str, enabled: bool) -> Result<()> {
         // The user quitting the pager early closes the pipe; that is not an error.
         let _ = stdin.write_all(text.as_bytes());
     }
-    child.wait()?;
+    let _ = child.wait();
     Ok(())
 }

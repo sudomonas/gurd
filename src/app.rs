@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::io::IsTerminal;
 use std::process::ExitCode;
@@ -20,6 +19,8 @@ use crate::update;
 pub fn run(cli: Cli) -> Result<ExitCode> {
     match cli.command {
         Some(Command::Database) => database(&cli),
+        Some(Command::Man { ref query }) => show_man(&cli, &query.join(" ")),
+        Some(Command::Raw { ref query }) => show_raw(&cli, &query.join(" ")),
         Some(Command::Search(ref args)) => find(&cli, args),
         None => find(&cli, &cli.search),
         Some(Command::Show { ref query }) => show(&cli, &query.join(" ")),
@@ -35,6 +36,18 @@ pub fn run(cli: Cli) -> Result<ExitCode> {
         },
         Some(Command::Class { ref query }) => class(&cli, &query.join(" ")),
         Some(Command::Sources) => list_sources(&cli),
+        Some(Command::Sync(ref args)) => {
+            let update_args = UpdateArgs {
+                sync: true,
+                url: args.url.clone(),
+                force: args.force,
+                keep_download: args.keep_download,
+                from: None,
+                source: "rxnorm".to_string(),
+                md5: None,
+            };
+            update(&cli, &update_args)
+        }
         Some(Command::Update(ref args)) => update(&cli, args),
         Some(Command::Remove { ref source }) => remove(&cli, source),
     }
@@ -74,14 +87,20 @@ fn source_versions(sources: &[SourceRecord]) -> Vec<SourceVersion> {
 
 fn find(cli: &Cli, args: &SearchArgs) -> Result<ExitCode> {
     let query = args.query_string();
-    if args.details {
-        return show(cli, &query);
+    if query.trim().is_empty() {
+        eprintln!("gurd: specify a drug name or query; run `gurd --help` for usage");
+        return Ok(ExitCode::from(2));
     }
+
+    if args.details {
+        return show_raw(cli, &query);
+    }
+
     let db = open(cli)?;
     let sources = db.sources()?;
-    let hits = search::search(&db, &query, args.limit)?;
 
     if cli.global.json {
+        let hits = search::search(&db, &query, args.limit)?;
         #[derive(Serialize)]
         struct Doc<'a> {
             json_version: u32,
@@ -98,90 +117,28 @@ fn find(cli: &Cli, args: &SearchArgs) -> Result<ExitCode> {
         return Ok(exit(!hits.is_empty()));
     }
 
+    // 1. Check if a clinical manual page can be generated directly for this query (exact match or curated alias)
+    if let Ok(Some(mono)) = crate::monograph::build(&db, &query, true) {
+        let text = render::man_page(&mono, &sources, style(cli));
+        output::page(&text, !cli.global.no_pager)?;
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    // 2. Perform database search
+    let hits = search::search(&db, &query, args.limit)?;
+
     match hits.first() {
-        None => eprintln!("gurd: no match for \"{query}\""),
-        // An exact match gets the summary page; anything else gets the list.
-        Some(top) if top.matched == Match::Exact => {
-            let mut exact: Vec<ConceptRef> = hits
-                .iter()
-                .filter(|h| h.matched == Match::Exact)
-                .map(|h| h.concept.clone())
-                .collect();
-            by_source_order(&mut exact);
-            let (entries, omitted) = details::page(&db, exact, LINKED_ON_SUMMARY, true)?;
-            let mut sections = Vec::new();
-            let mut attributes = Vec::new();
-            let mut classes = Vec::new();
-            // Records shown one per line (several of one source and kind) need no sections.
-            let listed: Vec<bool> = entries
-                .iter()
-                .map(|e| {
-                    e.via.is_none()
-                        && entries
-                            .iter()
-                            .filter(|o| {
-                                o.via.is_none()
-                                    && o.concept.source == e.concept.source
-                                    && o.concept.kind == e.concept.kind
-                            })
-                            .count()
-                            > 1
-                })
-                .collect();
-            for (e, &listed) in entries.iter().zip(&listed) {
-                if listed {
-                    sections.push(Default::default());
-                    attributes.push(details::attributes(&db, e.concept.id)?);
-                    classes.push(Vec::new());
-                    continue;
-                }
-                sections.push(details::sections(&db, &e.concept)?);
-                attributes.push(details::attributes(&db, e.concept.id)?);
-                // A record's own classes are among its attributes already; list only
-                // those of the records its source relates it to (an ingredient's products).
-                let own = details::classes(&db, &e.concept)?;
-                let mut related = details::classes_for(&db, &e.concept)?;
-                related.retain(|c| !own.iter().any(|o| o.system == c.system && o.code == c.code));
-                classes.push(related);
+        None => {
+            eprintln!("gurd: no match for \"{query}\"");
+            Ok(ExitCode::from(1))
+        }
+        Some(top) if top.matched == Match::Exact || hits.len() == 1 => {
+            if let Ok(Some(mono)) = crate::monograph::build(&db, &top.concept.name, false) {
+                let text = render::man_page(&mono, &sources, style(cli));
+                output::page(&text, !cli.global.no_pager)?;
+                return Ok(ExitCode::SUCCESS);
             }
-            let shown: HashSet<i64> = entries
-                .iter()
-                .map(|e| e.concept.id)
-                .chain(
-                    sections
-                        .iter()
-                        .flat_map(|m| m.values().flatten().map(|c| c.id)),
-                )
-                .collect();
-            let others: Vec<Hit> = hits
-                .iter()
-                .filter(|h| !shown.contains(&h.concept.id))
-                .take(5)
-                .cloned()
-                .collect();
-            let records: Vec<render::Summary> = entries
-                .iter()
-                .zip(&sections)
-                .zip(&attributes)
-                .zip(&classes)
-                .map(
-                    |(((entry, sections), attributes), classes)| render::Summary {
-                        entry,
-                        sections,
-                        attributes,
-                        classes,
-                    },
-                )
-                .collect();
-            let text = render::summary_page(
-                &top.concept.name,
-                &records,
-                &omitted,
-                &others,
-                &sources,
-                style(cli),
-            );
-            output::page(&text, !cli.global.no_pager)?;
+            show_raw(cli, &top.concept.name)
         }
         Some(_) => {
             output::emit(&render::hits(&hits, style(cli)))?;
@@ -191,11 +148,37 @@ fn find(cli: &Cli, args: &SearchArgs) -> Result<ExitCode> {
                     args.limit
                 );
             }
-            eprintln!("gurd: no exact match; `gurd show {query}` shows the best match in full");
+            eprintln!("gurd: run `gurd <name>` to view the clinical manual page");
+            Ok(ExitCode::SUCCESS)
         }
     }
-    Ok(exit(!hits.is_empty()))
 }
+
+/// Shows the clinical manual page (man page format) for a drug.
+fn show_man(cli: &Cli, query: &str) -> Result<ExitCode> {
+    let db = open(cli)?;
+    let sources = db.sources()?;
+    if let Some(mono) = crate::monograph::build(&db, query, false)? {
+        if cli.global.json {
+            output::emit_json(&mono)?;
+        } else {
+            let text = render::man_page(&mono, &sources, style(cli));
+            output::page(&text, !cli.global.no_pager)?;
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    // Fall back to raw details if no monograph could be built
+    show_raw(cli, query)
+}
+
+/// Show command displays the raw database records across installed sources.
+fn show(cli: &Cli, query: &str) -> Result<ExitCode> {
+    show_raw(cli, query)
+}
+
+/// Linked records shown per source and identifier in full details.
+const LINKED_IN_DETAILS: usize = 20;
 
 /// Orders records by source, in the order of `sources::builtin()` (official sources
 /// first), keeping the search ranking within a source.
@@ -209,14 +192,8 @@ fn by_source_order(concepts: &mut [ConceptRef]) {
     });
 }
 
-/// Linked records shown per source and identifier: on the summary page, and in full.
-const LINKED_ON_SUMMARY: usize = 3;
-const LINKED_IN_DETAILS: usize = 20;
-
-/// `gurd show QUERY`: the full page for the best match and every other record with the
-/// same name, plus linked records; or for every record with an identifier when QUERY
-/// looks like `system:value`.
-fn show(cli: &Cli, query: &str) -> Result<ExitCode> {
+/// Shows raw database records across all installed sources (legacy multi-source view).
+fn show_raw(cli: &Cli, query: &str) -> Result<ExitCode> {
     if let Some((system, value)) = details::parse_identifier(query) {
         return lookup_identifier(cli, query, &system, value);
     }
@@ -227,7 +204,6 @@ fn show(cli: &Cli, query: &str) -> Result<ExitCode> {
         if hit.matched == Match::Fuzzy && !cli.global.json {
             eprintln!("gurd: no match for \"{query}\"; showing the closest name");
         }
-        // Every record named exactly like the best match, from any source.
         concepts = search::search(&db, &hit.concept.name, 0)?
             .into_iter()
             .filter(|h| h.matched == Match::Exact)
@@ -335,6 +311,95 @@ fn database(cli: &Cli) -> Result<ExitCode> {
 
 fn update(cli: &Cli, args: &UpdateArgs) -> Result<ExitCode> {
     let path = config::database_path(cli.global.db.as_deref())?;
+
+    #[cfg(feature = "net")]
+    let http = crate::net::Http::new();
+    #[cfg(feature = "net")]
+    let fetch: Option<&dyn sources::Fetch> = Some(&http);
+    #[cfg(not(feature = "net"))]
+    let fetch: Option<&dyn sources::Fetch> = None;
+
+    let tty = std::io::stderr().is_terminal();
+    let mut log = |msg: &str| {
+        // Progress lines (\r...) only make sense on a terminal.
+        if msg.starts_with('\r') || msg == "\n" {
+            if tty {
+                eprint!("{msg}");
+            }
+        } else {
+            eprintln!("gurd: {msg}");
+        }
+    };
+
+    if args.sync {
+        let sync_opts = crate::sync::SyncOptions {
+            dest: &path,
+            url: args.url.as_deref(),
+            force: args.force,
+            keep_download: args.keep_download,
+            cache_dir: config::cache_dir()?,
+        };
+        let outcome = crate::sync::sync(&sync_opts, fetch, &mut log)?;
+        match outcome {
+            crate::sync::SyncOutcome::UpToDate { version, sources } => {
+                if cli.global.json {
+                    #[derive(Serialize)]
+                    struct Doc<'a> {
+                        json_version: u32,
+                        status: &'static str,
+                        version: &'a str,
+                        database: String,
+                    }
+                    output::emit_json(&Doc {
+                        json_version: JSON_VERSION,
+                        status: "up_to_date",
+                        version: &version,
+                        database: path.display().to_string(),
+                    })?;
+                } else {
+                    let src_list = sources
+                        .iter()
+                        .map(|s| s.slug.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    eprintln!("gurd: database is up to date (release {version})");
+                    eprintln!("      sources: {src_list}");
+                }
+            }
+            crate::sync::SyncOutcome::Updated {
+                version,
+                previous_version,
+                concepts_count,
+                sources,
+            } => {
+                if cli.global.json {
+                    #[derive(Serialize)]
+                    struct Doc<'a> {
+                        json_version: u32,
+                        status: &'static str,
+                        version: &'a str,
+                        previous_version: Option<&'a str>,
+                        database: String,
+                    }
+                    output::emit_json(&Doc {
+                        json_version: JSON_VERSION,
+                        status: "updated",
+                        version: &version,
+                        previous_version: previous_version.as_deref(),
+                        database: path.display().to_string(),
+                    })?;
+                } else {
+                    eprintln!("gurd: database updated successfully to release {version}");
+                    if let Some(cnt) = concepts_count {
+                        eprintln!("      {cnt} concepts across {} sources", sources.len());
+                    }
+                    eprintln!("      location: {}", path.display());
+                }
+            }
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+
     let Some(source) = sources::find(&args.source) else {
         let known: Vec<_> = sources::builtin().iter().map(|s| s.info().slug).collect();
         bail!(
@@ -343,13 +408,6 @@ fn update(cli: &Cli, args: &UpdateArgs) -> Result<ExitCode> {
             known.join(", ")
         );
     };
-
-    #[cfg(feature = "net")]
-    let http = crate::net::Http::new();
-    #[cfg(feature = "net")]
-    let fetch: Option<&dyn sources::Fetch> = Some(&http);
-    #[cfg(not(feature = "net"))]
-    let fetch: Option<&dyn sources::Fetch> = None;
 
     let options = update::Options {
         dest: &path,
@@ -363,17 +421,6 @@ fn update(cli: &Cli, args: &UpdateArgs) -> Result<ExitCode> {
     if let Some(file) = &args.from {
         eprintln!("gurd: importing {} from {}", args.source, file.display());
     }
-    let tty = std::io::stderr().is_terminal();
-    let mut log = |msg: &str| {
-        // Progress lines (\r...) only make sense on a terminal.
-        if msg.starts_with('\r') || msg == "\n" {
-            if tty {
-                eprint!("{msg}");
-            }
-        } else {
-            eprintln!("gurd: {msg}");
-        }
-    };
     let (imported, up_to_date) = match update::update(source.as_ref(), &options, fetch, &mut log)? {
         update::Outcome::Installed(imported) => (imported, Vec::new()),
         update::Outcome::UpToDate { source, version } => {

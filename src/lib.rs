@@ -10,11 +10,13 @@ pub mod database;
 pub mod details;
 pub mod import;
 pub mod models;
+pub mod monograph;
 pub mod normalize;
 pub mod output;
 pub mod render;
 pub mod search;
 pub mod sources;
+pub mod sync;
 pub mod update;
 
 #[cfg(feature = "net")]

@@ -621,3 +621,368 @@ pub fn classes(
     }
     s
 }
+
+/// Renders a comprehensive UNIX-style drug manual page (DRUG(7)).
+pub fn man_page(m: &crate::monograph::DrugMonograph, sources: &[SourceRecord], style: Style) -> String {
+    let mut s = String::new();
+    let upper_name = m.name.to_ascii_uppercase();
+    let header_title = format!("{}({})", upper_name, m.section);
+    let center_title = "Drug Reference Manual";
+
+    // Top Header: DRUG(7)       Drug Reference Manual       DRUG(7)
+    let total_width = 78;
+    let pad_left = (total_width - header_title.len() * 2 - center_title.len()) / 2;
+    let pad_right = total_width - header_title.len() * 2 - center_title.len() - pad_left;
+    let _ = writeln!(
+        s,
+        "{}{}{}{}{}",
+        style.bold(&header_title),
+        " ".repeat(pad_left.max(2)),
+        style.bold_white(center_title),
+        " ".repeat(pad_right.max(2)),
+        style.bold(&header_title)
+    );
+
+    // NAME section
+    let _ = writeln!(s, "\n{}", style.bold_yellow("NAME"));
+    let mut name_line = m.name.to_ascii_lowercase();
+    if let Some(pron) = &m.pronunciation {
+        name_line.push_str(&format!(" [{pron}]"));
+    }
+    if let Some(tag) = &m.tagline {
+        name_line.push_str(&format!(" - {tag}"));
+    }
+    for line in wrap_indent(&name_line, total_width, "    ", "    ") {
+        let _ = writeln!(s, "{line}");
+    }
+
+    // SYNOPSIS / QUICK FACTS
+    let _ = writeln!(s, "\n{}", style.bold_yellow("SYNOPSIS / QUICK FACTS"));
+    let mut facts: Vec<(&str, String)> = Vec::new();
+    if let Some(tc) = &m.therapeutic_class {
+        facts.push(("Therapeutic Class", tc.clone()));
+    }
+    if let Some(pc) = &m.pharmacologic_class {
+        facts.push(("Pharmacologic Class", pc.clone()));
+    }
+    if let Some(mc) = &m.mechanism_class {
+        facts.push(("Mechanism Class", mc.clone()));
+    }
+    if let Some(cc) = &m.chemical_class {
+        facts.push(("Chemical Class", cc.clone()));
+    }
+    if let Some(atc) = &m.atc_code {
+        facts.push(("ATC Code", atc.clone()));
+    }
+    if !m.routes.is_empty() {
+        facts.push(("Standard Routes", m.routes.join(", ")));
+    }
+    if !m.dosage_forms.is_empty() {
+        facts.push(("Dosage Forms", m.dosage_forms.join(", ")));
+    }
+    if !m.common_strengths.is_empty() {
+        facts.push(("Common Strengths", m.common_strengths.join(", ")));
+    }
+    if let Some(rx) = &m.prescription {
+        let habit = m.habit_forming.as_deref().unwrap_or("No");
+        facts.push(("Prescription Status", format!("{rx} (Habit forming: {habit})")));
+    }
+    let mut ids = Vec::new();
+    if let Some(rxcui) = &m.rxcui {
+        ids.push(format!("RxCUI: {rxcui}"));
+    }
+    if let Some(unii) = &m.unii {
+        ids.push(format!("UNII: {unii}"));
+    }
+    if let Some(cas) = &m.cas {
+        ids.push(format!("CAS: {cas}"));
+    }
+    if !ids.is_empty() {
+        facts.push(("Identifiers", ids.join(" | ")));
+    }
+
+    let key_width = facts.iter().map(|(k, _)| k.len()).max().unwrap_or(18);
+    for (key, val) in facts {
+        let prefix = format!("    {:key_width$} : ", style.bold_cyan(key));
+        let indent = " ".repeat(4 + key_width + 3);
+        let wrapped = wrap(&val, total_width.saturating_sub(4 + key_width + 3).max(24));
+        for (i, line) in wrapped.iter().enumerate() {
+            if i == 0 {
+                let _ = writeln!(s, "{prefix}{line}");
+            } else {
+                let _ = writeln!(s, "{indent}{line}");
+            }
+        }
+    }
+
+    // DESCRIPTION
+    if let Some(desc) = &m.description {
+        let _ = writeln!(s, "\n{}", style.bold_yellow("DESCRIPTION"));
+        for line in wrap_indent(desc, total_width, "    ", "    ") {
+            let _ = writeln!(s, "{line}");
+        }
+    }
+
+    // INDICATIONS & CLINICAL USAGE
+    if !m.indications.is_empty() || !m.off_label_uses.is_empty() {
+        let _ = writeln!(s, "\n{}", style.bold_yellow("INDICATIONS & CLINICAL USAGE"));
+        for ind in &m.indications {
+            for line in wrap_indent(ind, total_width, &format!("    {} ", style.cyan("•")), "      ") {
+                let _ = writeln!(s, "{line}");
+            }
+        }
+        if !m.off_label_uses.is_empty() {
+            let _ = writeln!(s, "    {}", style.bold("Off-Label / Investigational Uses:"));
+            for off in &m.off_label_uses {
+                for line in wrap_indent(off, total_width, &format!("      {} ", style.dim("-")), "        ") {
+                    let _ = writeln!(s, "{line}");
+                }
+            }
+        }
+    }
+
+    // DOSAGE & ADMINISTRATION
+    let has_dosing = !m.adult_dosing.is_empty()
+        || !m.pediatric_dosing.is_empty()
+        || !m.renal_adjustment.is_empty()
+        || !m.hepatic_adjustment.is_empty()
+        || !m.administration_tips.is_empty();
+
+    if has_dosing {
+        let _ = writeln!(s, "\n{}", style.bold_yellow("DOSAGE & ADMINISTRATION"));
+        if !m.adult_dosing.is_empty() {
+            let _ = writeln!(s, "    {}", style.bold("Adult Dosage & Administration:"));
+            for dose in &m.adult_dosing {
+                for line in wrap_indent(dose, total_width, &format!("      {} ", style.cyan("-")), "        ") {
+                    let _ = writeln!(s, "{line}");
+                }
+            }
+        }
+        if !m.pediatric_dosing.is_empty() {
+            let _ = writeln!(s, "    {}", style.bold("Pediatric Dosage:"));
+            for dose in &m.pediatric_dosing {
+                for line in wrap_indent(dose, total_width, &format!("      {} ", style.cyan("-")), "        ") {
+                    let _ = writeln!(s, "{line}");
+                }
+            }
+        }
+        if !m.renal_adjustment.is_empty() {
+            let _ = writeln!(s, "    {}", style.bold("Renal Impairment Dosage Adjustments:"));
+            for adj in &m.renal_adjustment {
+                for line in wrap_indent(adj, total_width, &format!("      {} ", style.cyan("-")), "        ") {
+                    let _ = writeln!(s, "{line}");
+                }
+            }
+        }
+        if !m.hepatic_adjustment.is_empty() {
+            let _ = writeln!(s, "    {}", style.bold("Hepatic Impairment Dosage Adjustments:"));
+            for adj in &m.hepatic_adjustment {
+                for line in wrap_indent(adj, total_width, &format!("      {} ", style.cyan("-")), "        ") {
+                    let _ = writeln!(s, "{line}");
+                }
+            }
+        }
+        if !m.administration_tips.is_empty() {
+            let _ = writeln!(s, "    {}", style.bold("Administration Guidance:"));
+            for tip in &m.administration_tips {
+                for line in wrap_indent(tip, total_width, &format!("      {} ", style.dim("-")), "        ") {
+                    let _ = writeln!(s, "{line}");
+                }
+            }
+        }
+    }
+
+    // BOXED WARNING (Black Box Warning)
+    if let Some(bw) = &m.boxed_warning {
+        let _ = writeln!(s, "\n{}", style.bold_red("BOXED WARNING"));
+        let box_width = (total_width - 4).min(74);
+        let inner_width = box_width - 4;
+        let _ = writeln!(s, "    ┌{}┐", "─".repeat(box_width - 2));
+        for raw_line in bw.lines() {
+            let wrapped = wrap(raw_line, inner_width);
+            for w in wrapped {
+                let pad = inner_width.saturating_sub(w.chars().count());
+                let _ = writeln!(
+                    s,
+                    "    │ {}{} │",
+                    style.bold_red(&w),
+                    " ".repeat(pad)
+                );
+            }
+        }
+        let _ = writeln!(s, "    └{}┘", "─".repeat(box_width - 2));
+    }
+
+    // CONTRAINDICATIONS
+    if !m.contraindications.is_empty() {
+        let _ = writeln!(s, "\n{}", style.bold_yellow("CONTRAINDICATIONS"));
+        for c in &m.contraindications {
+            for line in wrap_indent(c, total_width, &format!("    {} ", style.red("•")), "      ") {
+                let _ = writeln!(s, "{line}");
+            }
+        }
+    }
+
+    // WARNINGS & PRECAUTIONS
+    if !m.warnings_precautions.is_empty() {
+        let _ = writeln!(s, "\n{}", style.bold_yellow("WARNINGS & PRECAUTIONS"));
+        for w in &m.warnings_precautions {
+            for line in wrap_indent(w, total_width, &format!("    {} ", style.yellow("•")), "      ") {
+                let _ = writeln!(s, "{line}");
+            }
+        }
+    }
+
+    // ADVERSE REACTIONS
+    if !m.adverse_reactions_common.is_empty() || !m.adverse_reactions_serious.is_empty() {
+        let _ = writeln!(s, "\n{}", style.bold_yellow("ADVERSE REACTIONS & SIDE EFFECTS"));
+        if !m.adverse_reactions_common.is_empty() {
+            let _ = writeln!(s, "    {}", style.bold("Common Reactions:"));
+            for r in &m.adverse_reactions_common {
+                for line in wrap_indent(r, total_width, &format!("      {} ", style.cyan("-")), "        ") {
+                    let _ = writeln!(s, "{line}");
+                }
+            }
+        }
+        if !m.adverse_reactions_serious.is_empty() {
+            let _ = writeln!(s, "    {}", style.bold_red("Serious / Postmarketing Adverse Events:"));
+            for r in &m.adverse_reactions_serious {
+                for line in wrap_indent(r, total_width, &format!("      {} ", style.red("-")), "        ") {
+                    let _ = writeln!(s, "{line}");
+                }
+            }
+        }
+    }
+
+    // DRUG INTERACTIONS
+    if !m.drug_interactions.is_empty() {
+        let _ = writeln!(s, "\n{}", style.bold_yellow("DRUG INTERACTIONS"));
+        for ddi in &m.drug_interactions {
+            for line in wrap_indent(ddi, total_width, &format!("    {} ", style.cyan("•")), "      ") {
+                let _ = writeln!(s, "{line}");
+            }
+        }
+    }
+
+    // PHARMACOLOGY & PHARMACOKINETICS
+    if m.mechanism_of_action.is_some() || !m.pharmacokinetics.is_empty() {
+        let _ = writeln!(s, "\n{}", style.bold_yellow("PHARMACOLOGY & PHARMACOKINETICS"));
+        if let Some(moa) = &m.mechanism_of_action {
+            let _ = writeln!(s, "    {}", style.bold("Mechanism of Action:"));
+            for line in wrap_indent(moa, total_width, "      ", "      ") {
+                let _ = writeln!(s, "{line}");
+            }
+        }
+        if !m.pharmacokinetics.is_empty() {
+            let _ = writeln!(s, "    {}", style.bold("Pharmacokinetic Parameters:"));
+            let pk_key_width = m.pharmacokinetics.iter().map(|(k, _)| k.len()).max().unwrap_or(15);
+            for (param, val) in &m.pharmacokinetics {
+                let prefix = format!("      {:pk_key_width$} : ", style.bold_cyan(param));
+                let indent = " ".repeat(6 + pk_key_width + 3);
+                let wrapped = wrap(val, total_width.saturating_sub(6 + pk_key_width + 3).max(20));
+                for (i, line) in wrapped.iter().enumerate() {
+                    if i == 0 {
+                        let _ = writeln!(s, "{prefix}{line}");
+                    } else {
+                        let _ = writeln!(s, "{indent}{line}");
+                    }
+                }
+            }
+        }
+    }
+
+    // SPECIAL POPULATIONS
+    if let Some(sp) = &m.pregnancy_lactation {
+        let _ = writeln!(s, "\n{}", style.bold_yellow("SPECIAL POPULATIONS (PREGNANCY & LACTATION)"));
+        for raw_line in sp.lines() {
+            for line in wrap_indent(raw_line, total_width, "    ", "    ") {
+                let _ = writeln!(s, "{line}");
+            }
+        }
+    }
+
+    // COMMERCIAL BRANDS & PREPARATIONS
+    let has_brands = !m.us_brands.is_empty() || !m.india_brands.is_empty() || !m.substitutes.is_empty();
+    if has_brands {
+        let _ = writeln!(s, "\n{}", style.bold_yellow("COMMERCIAL BRANDS & PREPARATIONS"));
+        if !m.us_brands.is_empty() {
+            let _ = writeln!(s, "    {:16} : {}", style.bold("United States"), m.us_brands.join(", "));
+        }
+        if !m.india_brands.is_empty() {
+            let _ = writeln!(s, "    {:16} : {}", style.bold("India"), m.india_brands.join(", "));
+        }
+        if !m.substitutes.is_empty() {
+            let _ = writeln!(s, "    {:16} : {}", style.bold("Key Substitutes"), m.substitutes.join(", "));
+        }
+    }
+
+    // SEE ALSO
+    if !m.see_also.is_empty() {
+        let _ = writeln!(s, "\n{}", style.bold_yellow("SEE ALSO"));
+        for see in &m.see_also {
+            let _ = writeln!(s, "    {} {}", style.dim("•"), see);
+        }
+    }
+
+    // DATA CURRENCY & NOTICES (Disclose stale datasets)
+    let stale: Vec<_> = sources.iter().filter(|src| src.stale).collect();
+    if !stale.is_empty() {
+        let _ = writeln!(s, "\n{}", style.bold_yellow("DATA CURRENCY & SOURCE NOTICES"));
+        for src in stale {
+            let _ = writeln!(s, "    {} {}", style.dim("•"), release_note(src, style));
+        }
+    }
+
+    // Bottom Footer: gurd 0.3.0       October 2026       DRUG(7)
+    let version_str = format!("gurd {}", env!("CARGO_PKG_VERSION"));
+    let date_str = "October 2026";
+    let f_pad_left = (total_width - version_str.len() - date_str.len() - header_title.len()) / 2;
+    let f_pad_right = total_width - version_str.len() - date_str.len() - header_title.len() - f_pad_left;
+    let _ = writeln!(
+        s,
+        "\n{}{}{}{}{}",
+        style.dim(&version_str),
+        " ".repeat(f_pad_left.max(2)),
+        style.dim(date_str),
+        " ".repeat(f_pad_right.max(2)),
+        style.bold(&header_title)
+    );
+
+    s
+}
+
+/// Helper that wraps text with an initial indent for the first line and a separate indent for continuation lines.
+fn wrap_indent(text: &str, width: usize, first_indent: &str, rest_indent: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let first_w = width.saturating_sub(first_indent.chars().count()).max(20);
+    let rest_w = width.saturating_sub(rest_indent.chars().count()).max(20);
+
+    let words: Vec<&str> = text.split_whitespace().collect();
+    if words.is_empty() {
+        return out;
+    }
+
+    let mut line = String::new();
+    let mut is_first = true;
+    let mut cur_limit = first_w;
+
+    for word in words {
+        if !line.is_empty() && line.chars().count() + 1 + word.chars().count() > cur_limit {
+            let indent = if is_first { first_indent } else { rest_indent };
+            out.push(format!("{indent}{line}"));
+            line.clear();
+            is_first = false;
+            cur_limit = rest_w;
+        }
+        if !line.is_empty() {
+            line.push(' ');
+        }
+        line.push_str(word);
+    }
+    if !line.is_empty() {
+        let indent = if is_first { first_indent } else { rest_indent };
+        out.push(format!("{indent}{line}"));
+    }
+    out
+}
+

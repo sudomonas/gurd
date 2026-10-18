@@ -15,8 +15,13 @@ fn sources() -> Vec<(String, String)> {
                 let rel = path
                     .strip_prefix(env!("CARGO_MANIFEST_DIR"))
                     .unwrap()
-                    .display()
-                    .to_string();
+                    .components()
+                    .filter_map(|c| match c {
+                        std::path::Component::Normal(p) => p.to_str(),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("/");
                 out.push((rel, fs::read_to_string(&path).unwrap()));
             }
         }

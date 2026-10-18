@@ -5,8 +5,10 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 const AFTER_HELP: &str = "\
 Examples:
   gurd metformin
+  gurd man atorvastatin
   gurd \"amoxicillin clavulanate\"
   gurd metformin --json
+  gurd raw metformin
   gurd rxcui 6809
   gurd database
 
@@ -79,11 +81,23 @@ pub struct SearchArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Show a clinical manual page for a drug (man page format)
+    Man {
+        #[arg(required = true, value_name = "QUERY")]
+        query: Vec<String>,
+    },
+
     /// Search by name (use when the name collides with a subcommand)
     Search(SearchArgs),
 
-    /// Show the detailed view of the best match
+    /// Show the detailed view / man page of the best match
     Show {
+        #[arg(required = true, value_name = "QUERY")]
+        query: Vec<String>,
+    },
+
+    /// Show raw database records across all installed sources (legacy view)
+    Raw {
         #[arg(required = true, value_name = "QUERY")]
         query: Vec<String>,
     },
@@ -113,6 +127,9 @@ pub enum Command {
     /// List the data sources this build supports, their licenses and what is installed
     Sources,
 
+    /// Sync the database from the official rolling release (uses the network)
+    Sync(SyncArgs),
+
     /// Download, import and install source datasets (uses the network)
     Update(UpdateArgs),
 
@@ -124,7 +141,26 @@ pub enum Command {
 }
 
 #[derive(Debug, Args)]
+pub struct SyncArgs {
+    /// URL of manifest.json [default: https://github.com/sudomonas/gurd/releases/download/database/manifest.json]
+    #[arg(long, value_name = "URL", env = "GURD_SYNC_URL")]
+    pub url: Option<String>,
+
+    /// Re-download and install even if the database is already up to date
+    #[arg(long)]
+    pub force: bool,
+
+    /// Keep the downloaded archive in the cache directory
+    #[arg(long)]
+    pub keep_download: bool,
+}
+
+#[derive(Debug, Args)]
 pub struct UpdateArgs {
+    /// Sync the database from the official rolling release instead of importing raw datasets
+    #[arg(long)]
+    pub sync: bool,
+
     /// Import from a local release file or directory instead of downloading
     #[arg(long, value_name = "FILE", conflicts_with = "url")]
     pub from: Option<PathBuf>,

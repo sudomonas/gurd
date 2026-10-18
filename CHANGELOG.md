@@ -7,9 +7,16 @@ All notable changes to this project are listed here. The format follows
 Changes to the JSON output format ([docs/json.md](docs/json.md)) that break consumers
 increment `json_version` and are marked **Breaking** here.
 
-## [Unreleased]
+## [0.3.0] - 2026-10-18
 
 ### Added
+
+- **Multi-platform support**: Native directory and cache resolution on **Windows** (`%LOCALAPPDATA%\gurd`) and **macOS** (`~/Library/Application Support/gurd`), and cross-platform terminal pager execution.
+- **Automated multi-platform binary releases**: GitHub Actions workflow building optimized release archives for Linux (universal static musl + glibc on x86_64 and aarch64), macOS (Apple Silicon and Intel), and Windows (x86_64).
+- **Rolling database pipeline**: Added `gurd sync` command to download and update prebuilt curated databases with SHA-256 verification, and `scripts/publish-db.sh` for maintainer publishing.
+- **One-line installers**: `install.sh` for Linux and macOS, and `install.ps1` for Windows PowerShell.
+- **Clinical monographs**: `gurd man <query>` curated clinical reference cards with indications, contraindications, mechanism, adverse effects, and dosage.
+- **cargo-binstall** metadata in `Cargo.toml`.
 
 - New sources: **openFDA NDC Directory** (`openfda`), **RxTerms** (`rxterms`), and two
   unofficial Indian datasets for personal use: **1mg medicines** (`1mg`) and the

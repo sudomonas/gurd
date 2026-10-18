@@ -63,19 +63,44 @@ incomplete; check the release date that every result displays.
 
 ## Installation
 
-### Prebuilt binary (Linux x86_64)
+### Quick install (Linux & macOS)
 
-Each [GitHub release](https://github.com/sudomonas/gurd/releases) has a
-`gurd-VERSION-x86_64-linux-gnu.tar.gz` archive and its SHA-256 checksum. The binary
-needs glibc 2.39 or newer (e.g. Arch, Fedora 40+, Ubuntu 24.04+, Debian 13+).
+Install the latest precompiled binary into `~/.local/bin`:
 
 ```sh
-curl -LO https://github.com/sudomonas/gurd/releases/download/v0.2.0/gurd-0.2.0-x86_64-linux-gnu.tar.gz
-curl -LO https://github.com/sudomonas/gurd/releases/download/v0.2.0/gurd-0.2.0-x86_64-linux-gnu.tar.gz.sha256
-sha256sum -c gurd-0.2.0-x86_64-linux-gnu.tar.gz.sha256
-tar xzf gurd-0.2.0-x86_64-linux-gnu.tar.gz
-install -Dm755 gurd-0.2.0-x86_64-linux-gnu/gurd ~/.local/bin/gurd
+curl -proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/sudomonas/gurd/main/install.sh | sh
 ```
+
+### Quick install (Windows)
+
+Run in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/sudomonas/gurd/main/install.ps1 | iex
+```
+
+### cargo-binstall
+
+If you have [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall) installed:
+
+```sh
+cargo binstall gurd
+```
+
+### Manual download from GitHub Releases
+
+Prebuilt binaries with SHA-256 checksums are attached to each [GitHub release](https://github.com/sudomonas/gurd/releases):
+
+| Platform | Target | Archive |
+|---|---|---|
+| **Linux (x86_64, universal static)** | `x86_64-unknown-linux-musl` | `gurd-x86_64-unknown-linux-musl.tar.gz` |
+| **Linux (ARM64, universal static)** | `aarch64-unknown-linux-musl` | `gurd-aarch64-unknown-linux-musl.tar.gz` |
+| **Linux (x86_64, glibc)** | `x86_64-unknown-linux-gnu` | `gurd-x86_64-unknown-linux-gnu.tar.gz` |
+| **macOS (Apple Silicon M-series)** | `aarch64-apple-darwin` | `gurd-aarch64-apple-darwin.tar.gz` |
+| **macOS (Intel)** | `x86_64-apple-darwin` | `gurd-x86_64-apple-darwin.tar.gz` |
+| **Windows (x86_64)** | `x86_64-pc-windows-msvc` | `gurd-x86_64-pc-windows-msvc.zip` |
+
+The static `musl` builds for Linux have no glibc version requirements and run on any Linux distribution (Ubuntu, Debian, Fedora, Arch, Alpine, RHEL, etc.).
 
 ### From source
 
@@ -107,7 +132,19 @@ It is not on the AUR yet.
 
 ## Getting a database
 
-`gurd` ships without data. Install one or more sources with `gurd update`:
+### Option 1: Rolling release sync (Recommended)
+
+Get the latest prebuilt database directly from the project's rolling release:
+
+```sh
+gurd sync
+```
+
+This downloads and installs the complete prebuilt database in seconds, verified with SHA-256. Running `gurd sync` anytime checks if a newer release exists and automatically updates like a rolling release.
+
+### Option 2: Build from raw source datasets
+
+You can also import and build datasets directly from their raw provider archives using `gurd update`:
 
 ```sh
 gurd update                                    # RxNorm, downloaded from NLM

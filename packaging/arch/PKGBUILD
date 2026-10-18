@@ -1,7 +1,7 @@
 # Draft PKGBUILD for gurd. Not yet on the AUR.
 # Before publishing: replace SKIP with the tarball's sha256sum (updpkgsums).
 pkgname=gurd
-pkgver=0.2.0
+pkgver=0.3.0
 pkgrel=1
 pkgdesc='Local-first terminal drug lookup'
 arch=('x86_64' 'aarch64')
