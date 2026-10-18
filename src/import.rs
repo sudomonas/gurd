@@ -4,7 +4,7 @@
 //! validated, and only then renamed over the installed one. Any failure before the
 //! rename removes the temporary file and leaves the installed database untouched.
 
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
@@ -142,7 +142,7 @@ pub fn build(path: &Path, jobs: &[Job]) -> Result<Vec<Imported>> {
     )?;
     drop(conn);
 
-    File::open(path)?.sync_all()?;
+    OpenOptions::new().write(true).open(path)?.sync_all()?;
     // Final check through the same path lookups use.
     Database::open(path)?;
     Ok(report)
